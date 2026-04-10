@@ -567,7 +567,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
           </div>
 
-          <div className="fixed end-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 lg:hidden">
+          <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 lg:hidden">
             <div className="relative">
               <button
                 type="button"
@@ -588,7 +588,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     onClick={() => setMoreMenuOpen(false)}
                   />
                   <div
-                    className="absolute start-0 top-full z-40 mt-1 min-w-[12rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                    className="absolute right-0 top-full z-40 mt-1 min-w-[12rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                     role="menu"
                   >
                     <button
