@@ -285,6 +285,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     }
     setEditingTopicId(null);
     await loadTopics();
+    await loadTasks();
   };
 
   const logout = async () => {
