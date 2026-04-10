@@ -679,9 +679,21 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </p>
               )}
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  סינון לפי טווח תאריכים (מועד לביצוע או לביצוע עד)
-                </span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 flex-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    סינון לפי טווח תאריכים (מועד לביצוע או לביצוע עד)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftDateFrom("");
+                      setDraftDateTo("");
+                    }}
+                    className="shrink-0 rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    אפס טווח תאריכים
+                  </button>
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
                   <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
                     <span>מתאריך</span>
@@ -744,7 +756,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               title="סינון מטלות"
               aria-label="סינון מטלות"
             >
-              🔍
+              🎛️
             </button>
           </div>
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
