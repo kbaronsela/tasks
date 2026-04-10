@@ -89,6 +89,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [inviteResults, setInviteResults] = useState<
     { email: string; ok: boolean; emailSent?: boolean; inviteUrl?: string; error?: string }[] | null
   >(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [copyInviteHint, setCopyInviteHint] = useState<string | null>(null);
 
   const loadTopics = useCallback(async () => {
     const r = await fetch("/api/topics");
@@ -314,6 +317,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     e.preventDefault();
     setError(null);
     setInviteResults(null);
+    setCopyInviteHint(null);
     setInviteSending(true);
     try {
       const r = await fetch("/api/invitations", {
@@ -328,10 +332,33 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       }
       setInviteResults(data.results ?? []);
       setInviteEmailsRaw("");
-      setToast("הזמנות נוצרו — בדקי את התוצאות למטה");
-      setTimeout(() => setToast(null), 4000);
     } finally {
       setInviteSending(false);
+    }
+  };
+
+  const inviteTextToCopy = useMemo(() => {
+    if (!inviteResults?.length) return "";
+    const blocks: string[] = [];
+    for (const row of inviteResults) {
+      if (row.ok && row.inviteUrl) {
+        blocks.push(
+          `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול המטלות.\n\nלהרשמה (לכתובת ${row.email}):\n${row.inviteUrl}\n\nהקישור תקף למספר ימים.`
+        );
+      }
+    }
+    return blocks.join("\n\n──────────\n\n");
+  }, [inviteResults, user.name]);
+
+  const copyInviteText = async () => {
+    if (!inviteTextToCopy) return;
+    try {
+      await navigator.clipboard.writeText(inviteTextToCopy);
+      setCopyInviteHint("הטקסט הועתק ללוח");
+      setTimeout(() => setCopyInviteHint(null), 2500);
+    } catch {
+      setCopyInviteHint("לא ניתן להעתיק — סמני את הטקסט ידנית");
+      setTimeout(() => setCopyInviteHint(null), 3500);
     }
   };
 
@@ -378,9 +405,47 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
             מטלה חדשה
           </button>
-          <button type="button" onClick={logout} className={`${btnGhost} col-span-2 w-full sm:col-span-1 sm:w-auto`}>
+          <button type="button" onClick={logout} className={`${btnGhost} col-span-1 w-full sm:w-auto`}>
             יציאה
           </button>
+          <div className="relative col-span-1 flex justify-end sm:col-span-1">
+            <button
+              type="button"
+              onClick={() => setMoreMenuOpen((o) => !o)}
+              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 text-sm text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              aria-expanded={moreMenuOpen}
+              aria-haspopup="menu"
+              title="עוד אפשרויות"
+            >
+              ⋯
+            </button>
+            {moreMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-30 cursor-default bg-transparent"
+                  aria-label="סגירת תפריט"
+                  onClick={() => setMoreMenuOpen(false)}
+                />
+                <div
+                  className="absolute end-0 top-full z-40 mt-1 min-w-[11rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      setInviteModalOpen(true);
+                    }}
+                  >
+                    הזמנת משתמשים
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -394,59 +459,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           {toast}
         </div>
       )}
-
-      <section className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-3 shadow-sm sm:p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
-        <h2 className="mb-2 text-base font-semibold sm:text-lg">הזמנת משתמשים</h2>
-        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-          הזיני כתובת מייל אחת או כמה (מופרדות בפסיק, רווח או שורה חדשה). יישלח מייל עם קישור להרשמה — אם לא הוגדר
-          SMTP בשרת, תקבלי קישור להעתקה לכל כתובת.
-        </p>
-        <form onSubmit={submitInvites} className="flex flex-col gap-3">
-          <textarea
-            value={inviteEmailsRaw}
-            onChange={(e) => setInviteEmailsRaw(e.target.value)}
-            placeholder={"דוגמה: friend@mail.com, other@gmail.com"}
-            rows={3}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-          />
-          <button
-            type="submit"
-            disabled={inviteSending || !inviteEmailsRaw.trim()}
-            className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto"
-          >
-            {inviteSending ? "שולח…" : "שליחת הזמנות"}
-          </button>
-        </form>
-        {inviteResults && inviteResults.length > 0 && (
-          <ul className="mt-4 space-y-2 text-sm">
-            {inviteResults.map((row, i) => (
-              <li
-                key={`${row.email}-${i}`}
-                className={`rounded-lg border px-3 py-2 ${
-                  row.ok
-                    ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30"
-                    : "border-red-200 bg-red-50/80 dark:border-red-900 dark:bg-red-950/30"
-                }`}
-              >
-                <span className="font-medium">{row.email}</span>
-                {!row.ok && row.error && (
-                  <span className="mr-2 text-red-700 dark:text-red-300">— {row.error}</span>
-                )}
-                {row.ok && (
-                  <span className="mr-2 text-emerald-800 dark:text-emerald-200">
-                    {row.emailSent ? "נשלח מייל" : "לא נשלח מייל (אין SMTP) — העתיקי את הקישור:"}
-                  </span>
-                )}
-                {row.ok && row.inviteUrl && !row.emailSent && (
-                  <div className="mt-1 break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                    {row.inviteUrl}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-3 text-base font-semibold sm:text-lg">נושאים</h2>
@@ -628,6 +640,92 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           <p className="text-zinc-500">אין מטלות להצגה בטווח הנבחר.</p>
         )}
       </section>
+
+      {inviteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setInviteModalOpen(false)}
+        >
+          <div className="my-auto w-full max-w-lg max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              הזיני כתובת מייל אחת או כמה (פסיק, רווח או שורה חדשה). אחרי יצירת ההזמנה תוכלי להעתיק טקסט מוכן לשליחה
+              (ווטסאפ / מייל).
+            </p>
+            <form onSubmit={submitInvites} className="mt-4 flex flex-col gap-3">
+              <textarea
+                value={inviteEmailsRaw}
+                onChange={(e) => setInviteEmailsRaw(e.target.value)}
+                placeholder="friend@mail.com, other@gmail.com"
+                rows={3}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+              />
+              <button
+                type="submit"
+                disabled={inviteSending || !inviteEmailsRaw.trim()}
+                className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto"
+              >
+                {inviteSending ? "יוצר…" : "צור קישורי הזמנה"}
+              </button>
+            </form>
+            {inviteResults && inviteResults.length > 0 && (
+              <div className="mt-4 space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                <ul className="space-y-1.5 text-sm">
+                  {inviteResults.map((row, i) => (
+                    <li
+                      key={`${row.email}-${i}`}
+                      className={row.ok ? "text-emerald-800 dark:text-emerald-200" : "text-red-700 dark:text-red-300"}
+                    >
+                      <span className="font-medium">{row.email}</span>
+                      {!row.ok && row.error && ` — ${row.error}`}
+                      {row.ok && row.emailSent && " — נשלח מייל (אם הוגדר SMTP)"}
+                    </li>
+                  ))}
+                </ul>
+                {inviteTextToCopy ? (
+                  <>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      טקסט להעתקה
+                    </label>
+                    <textarea
+                      readOnly
+                      value={inviteTextToCopy}
+                      rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
+                      className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyInviteText}
+                        className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                      >
+                        העתק טקסט
+                      </button>
+                      {copyInviteHint && (
+                        <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  inviteResults.some((r) => r.ok) && (
+                    <p className="text-sm text-zinc-500">לא נוצרו קישורים תקינים להעתקה.</p>
+                  )
+                )}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInviteModalOpen(false)}
+                className="min-h-11 rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                סגירה
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {topicModal && (
         <div
