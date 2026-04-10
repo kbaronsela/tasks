@@ -51,6 +51,37 @@ function formatHeDate(iso: string | null): string {
   });
 }
 
+function ModalCloseButton({
+  onClick,
+  align = "center",
+}: {
+  onClick: () => void;
+  align?: "center" | "top";
+}) {
+  const alignCls =
+    align === "center" ? "top-1/2 -translate-y-1/2" : "top-0";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 ${alignCls}`}
+      aria-label="סגור"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="size-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        aria-hidden
+      >
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
 export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -656,24 +687,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         >
           <div className="relative my-auto w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
             <div className="relative mb-4 flex min-h-9 items-center justify-center">
-              <button
-                type="button"
-                onClick={cancelFilterModal}
-                className="absolute left-0 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                aria-label="סגור"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="size-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden
-                >
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
+              <ModalCloseButton onClick={cancelFilterModal} />
               <h3 className="text-center text-base font-semibold sm:text-lg">סינון מטלות</h3>
             </div>
             <div className="mt-4 flex flex-col gap-4">
@@ -916,8 +930,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           onClick={(e) => e.target === e.currentTarget && setInviteModalOpen(false)}
         >
           <div className="my-auto w-full max-w-lg max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
-            <div className="mt-4 flex flex-col gap-3">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <ModalCloseButton onClick={() => setInviteModalOpen(false)} />
+              <h3 className="text-center text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
+            </div>
+            <div className="flex flex-col gap-3">
               {inviteSending && (
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">יוצר קישור הזמנה…</p>
               )}
@@ -932,39 +949,19 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
                     className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
                   />
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={copyInviteText}
-                        className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-                      >
-                        העתק טקסט
-                      </button>
-                      {copyInviteHint && (
-                        <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setInviteModalOpen(false)}
-                      className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                      onClick={copyInviteText}
+                      className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
                     >
-                      סגירה
+                      העתק טקסט
                     </button>
+                    {copyInviteHint && (
+                      <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
+                    )}
                   </div>
                 </>
-              )}
-              {!inviteSending && inviteError && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setInviteModalOpen(false)}
-                    className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
-                  >
-                    סגירה
-                  </button>
-                </div>
               )}
             </div>
           </div>
@@ -978,15 +975,18 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           onClick={(e) => e.target === e.currentTarget && setTopicsListModalOpen(false)}
         >
           <div className="my-auto w-full max-w-lg max-h-[min(88dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <h3 className="text-base font-semibold sm:text-lg">נושאים</h3>
-              <button
-                type="button"
-                onClick={openNewTopicModal}
-                className={`${btnSecondary} w-full shrink-0 sm:w-auto`}
-              >
-                נושא חדש
-              </button>
+            <div className="relative mb-4 pl-10">
+              <ModalCloseButton align="top" onClick={() => setTopicsListModalOpen(false)} />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <h3 className="text-base font-semibold sm:text-lg">נושאים</h3>
+                <button
+                  type="button"
+                  onClick={openNewTopicModal}
+                  className={`${btnSecondary} w-full shrink-0 sm:w-auto`}
+                >
+                  נושא חדש
+                </button>
+              </div>
             </div>
             <ul className="mt-4 flex flex-col gap-2">
               {topics.map((t) => (
@@ -1019,15 +1019,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             {topics.length === 0 && (
               <p className="mt-4 text-sm text-zinc-500">אין נושאים עדיין.</p>
             )}
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setTopicsListModalOpen(false)}
-                className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
-              >
-                סגירה
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -1044,8 +1035,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           }}
         >
           <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">נושא חדש</h3>
-            <form onSubmit={submitTopic} className="mt-4 flex flex-col gap-3">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <ModalCloseButton
+                onClick={() => {
+                  setTopicModal(false);
+                  setTopicModalForTask(false);
+                }}
+              />
+              <h3 className="text-center text-base font-semibold sm:text-lg">נושא חדש</h3>
+            </div>
+            <form onSubmit={submitTopic} className="flex flex-col gap-3">
               <input
                 required
                 placeholder="שם הנושא"
@@ -1098,17 +1097,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   ))}
                 </div>
               </div>
-              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTopicModal(false);
-                    setTopicModalForTask(false);
-                  }}
-                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
-                >
-                  ביטול
-                </button>
+              <div className="mt-2 flex justify-stretch pt-2 sm:justify-end">
                 <button
                   type="submit"
                   className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
@@ -1128,8 +1117,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           onClick={(e) => e.target === e.currentTarget && setEditingTopicId(null)}
         >
           <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">עריכת נושא</h3>
-            <form onSubmit={submitEditTopic} className="mt-4 flex flex-col gap-3">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <ModalCloseButton onClick={() => setEditingTopicId(null)} />
+              <h3 className="text-center text-base font-semibold sm:text-lg">עריכת נושא</h3>
+            </div>
+            <form onSubmit={submitEditTopic} className="flex flex-col gap-3">
               <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
                 שם
                 <input
@@ -1184,14 +1176,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   ))}
                 </div>
               </div>
-              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setEditingTopicId(null)}
-                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
-                >
-                  ביטול
-                </button>
+              <div className="mt-2 flex justify-stretch pt-2 sm:justify-end">
                 <button
                   type="submit"
                   className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
@@ -1211,10 +1196,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           onClick={(e) => e.target === e.currentTarget && setTaskModal(false)}
         >
           <div className="my-auto w-full max-w-lg max-h-[min(92dvh,840px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">
-              {editTaskId ? "עריכת מטלה" : "מטלה חדשה"}
-            </h3>
-            <form onSubmit={submitTask} className="mt-4 flex flex-col gap-3">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <ModalCloseButton onClick={() => setTaskModal(false)} />
+              <h3 className="text-center text-base font-semibold sm:text-lg">
+                {editTaskId ? "עריכת מטלה" : "מטלה חדשה"}
+              </h3>
+            </div>
+            <form onSubmit={submitTask} className="flex flex-col gap-3">
               <input
                 required
                 placeholder="כותרת"
@@ -1333,14 +1321,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   )}
                 </div>
               </div>
-              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setTaskModal(false)}
-                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
-                >
-                  ביטול
-                </button>
+              <div className="mt-2 flex justify-stretch pt-2 sm:justify-end">
                 <button
                   type="submit"
                   className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
