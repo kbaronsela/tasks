@@ -57,6 +57,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [topicFilter, setTopicFilter] = useState<string>("all");
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -83,6 +84,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [editTopicColorAuto, setEditTopicColorAuto] = useState(true);
   const [editTopicColorHex, setEditTopicColorHex] = useState("#6366f1");
 
+  const [inviteEmailsRaw, setInviteEmailsRaw] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteResults, setInviteResults] = useState<
+    { email: string; ok: boolean; emailSent?: boolean; inviteUrl?: string; error?: string }[] | null
+  >(null);
+
   const loadTopics = useCallback(async () => {
     const r = await fetch("/api/topics");
     if (!r.ok) throw new Error("טעינת נושאים נכשלה");
@@ -91,12 +98,19 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   }, []);
 
   const loadTasks = useCallback(async () => {
-    const q = topicFilter === "all" ? "" : `?topic=${encodeURIComponent(topicFilter)}`;
+    const params = new URLSearchParams();
+    if (topicFilter !== "all") {
+      params.set("topic", topicFilter);
+    }
+    if (showCompletedTasks) {
+      params.set("showCompleted", "1");
+    }
+    const q = params.toString() ? `?${params.toString()}` : "";
     const r = await fetch(`/api/tasks${q}`);
     if (!r.ok) throw new Error("טעינת מטלות נכשלה");
     const data = await r.json();
     setTasks(data.tasks);
-  }, [topicFilter]);
+  }, [topicFilter, showCompletedTasks]);
 
   const loadUsers = useCallback(async () => {
     const r = await fetch("/api/users");
@@ -296,6 +310,31 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     router.refresh();
   };
 
+  const submitInvites = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setInviteResults(null);
+    setInviteSending(true);
+    try {
+      const r = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailsRaw: inviteEmailsRaw }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(data.error ?? "שליחת הזמנות נכשלה");
+        return;
+      }
+      setInviteResults(data.results ?? []);
+      setInviteEmailsRaw("");
+      setToast("הזמנות נוצרו — בדקי את התוצאות למטה");
+      setTimeout(() => setToast(null), 4000);
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
   const prereqOptions = useMemo(() => {
     return tasks.filter((x) => x.id !== editTaskId);
   }, [tasks, editTaskId]);
@@ -356,6 +395,59 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
+      <section className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-3 shadow-sm sm:p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
+        <h2 className="mb-2 text-base font-semibold sm:text-lg">הזמנת משתמשים</h2>
+        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+          הזיני כתובת מייל אחת או כמה (מופרדות בפסיק, רווח או שורה חדשה). יישלח מייל עם קישור להרשמה — אם לא הוגדר
+          SMTP בשרת, תקבלי קישור להעתקה לכל כתובת.
+        </p>
+        <form onSubmit={submitInvites} className="flex flex-col gap-3">
+          <textarea
+            value={inviteEmailsRaw}
+            onChange={(e) => setInviteEmailsRaw(e.target.value)}
+            placeholder={"דוגמה: friend@mail.com, other@gmail.com"}
+            rows={3}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <button
+            type="submit"
+            disabled={inviteSending || !inviteEmailsRaw.trim()}
+            className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto"
+          >
+            {inviteSending ? "שולח…" : "שליחת הזמנות"}
+          </button>
+        </form>
+        {inviteResults && inviteResults.length > 0 && (
+          <ul className="mt-4 space-y-2 text-sm">
+            {inviteResults.map((row, i) => (
+              <li
+                key={`${row.email}-${i}`}
+                className={`rounded-lg border px-3 py-2 ${
+                  row.ok
+                    ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30"
+                    : "border-red-200 bg-red-50/80 dark:border-red-900 dark:bg-red-950/30"
+                }`}
+              >
+                <span className="font-medium">{row.email}</span>
+                {!row.ok && row.error && (
+                  <span className="mr-2 text-red-700 dark:text-red-300">— {row.error}</span>
+                )}
+                {row.ok && (
+                  <span className="mr-2 text-emerald-800 dark:text-emerald-200">
+                    {row.emailSent ? "נשלח מייל" : "לא נשלח מייל (אין SMTP) — העתיקי את הקישור:"}
+                  </span>
+                )}
+                {row.ok && row.inviteUrl && !row.emailSent && (
+                  <div className="mt-1 break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                    {row.inviteUrl}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-3 text-base font-semibold sm:text-lg">נושאים</h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
@@ -414,6 +506,15 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
             </p>
           )}
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <input
+              type="checkbox"
+              checked={showCompletedTasks}
+              onChange={(e) => setShowCompletedTasks(e.target.checked)}
+              className="size-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            הצג גם מטלות שבוצעו (בסוף הרשימה)
+          </label>
         </div>
       </div>
 

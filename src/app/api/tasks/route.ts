@@ -20,10 +20,12 @@ function effectiveSortMs(task: { scheduledAt: Date | null; dueAt: Date | null })
   return null;
 }
 
-function sortTasksBySchedule<T extends { scheduledAt: Date | null; dueAt: Date | null; createdAt: Date }>(
-  tasks: T[]
-): T[] {
+/** מטלות פתוחות קודם, אחריהן מטלות שבוצעו; בכל קבוצה — לפי מועדים */
+function sortTasksForDisplay<
+  T extends { done: boolean; scheduledAt: Date | null; dueAt: Date | null; createdAt: Date },
+>(tasks: T[]): T[] {
   return [...tasks].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
     const ka = effectiveSortMs(a);
     const kb = effectiveSortMs(b);
     if (ka == null && kb == null) return b.createdAt.getTime() - a.createdAt.getTime();
@@ -39,7 +41,11 @@ export async function GET(req: NextRequest) {
   if (!session) return response!;
 
   const topicFilter = req.nextUrl.searchParams.get("topic") ?? "all";
+  const showCompleted =
+    req.nextUrl.searchParams.get("showCompleted") === "1" ||
+    req.nextUrl.searchParams.get("showCompleted") === "true";
 
+  const doneWhere = showCompleted ? {} : { done: false };
   const include: TaskApiInclude = {
     topic: { select: { id: true, title: true, color: true } },
     users: { include: { user: { select: { id: true, name: true, email: true } } } },
@@ -60,11 +66,11 @@ export async function GET(req: NextRequest) {
     }
 
     const raw = await prisma.task.findMany({
-      where: { topicId: topicFilter },
+      where: { topicId: topicFilter, ...doneWhere },
       include,
     });
 
-    const tasks = sortTasksBySchedule(raw);
+    const tasks = sortTasksForDisplay(raw);
     return NextResponse.json({
       tasks: tasks.map((t) => toTaskApiJson(t, session.userId)),
     });
@@ -80,11 +86,11 @@ export async function GET(req: NextRequest) {
   }
 
   const raw = await prisma.task.findMany({
-    where: { ...baseWhere, ...topicWhere },
+    where: { ...baseWhere, ...topicWhere, ...doneWhere },
     include,
   });
 
-  const tasks = sortTasksBySchedule(raw);
+  const tasks = sortTasksForDisplay(raw);
 
   return NextResponse.json({
     tasks: tasks.map((t) => toTaskApiJson(t, session.userId)),

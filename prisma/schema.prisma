@@ -8,15 +8,29 @@ datasource db {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   name         String
   passwordHash String
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime     @default(now())
   topics       TopicUser[]
   tasks        TaskUser[]
-  topicsCreated Topic[]    @relation("TopicCreator")
-  tasksCreated  Task[]     @relation("TaskCreator")
+  topicsCreated Topic[]     @relation("TopicCreator")
+  tasksCreated  Task[]      @relation("TaskCreator")
+  invitationsSent Invitation[] @relation("InvitedBy")
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  token       String    @unique
+  expiresAt   DateTime
+  invitedById String
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  usedAt      DateTime?
+
+  @@index([email])
 }
 
 model Topic {
