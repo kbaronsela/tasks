@@ -843,10 +843,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           onClick={(e) => e.target === e.currentTarget && setTopicsListModalOpen(false)}
         >
           <div className="my-auto w-full max-w-lg max-h-[min(88dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">נושאים</h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              כל הנושאים שמשויכים אליך. לעריכה או מחיקה השתמשי בכפתורים ליד כל נושא.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <h3 className="text-base font-semibold sm:text-lg">נושאים</h3>
+              <button
+                type="button"
+                onClick={openNewTopicModal}
+                className={`${btnSecondary} w-full shrink-0 sm:w-auto`}
+              >
+                נושא חדש
+              </button>
+            </div>
             <ul className="mt-4 flex flex-col gap-2">
               {topics.map((t) => (
                 <li
@@ -876,9 +882,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               ))}
             </ul>
             {topics.length === 0 && (
-              <p className="mt-4 text-sm text-zinc-500">
-                אין נושאים עדיין — אפשר ליצור נושא ממסך יצירת מטלה חדשה או בקיצור Ctrl+T.
-              </p>
+              <p className="mt-4 text-sm text-zinc-500">אין נושאים עדיין.</p>
             )}
             <div className="mt-6 flex justify-end">
               <button
