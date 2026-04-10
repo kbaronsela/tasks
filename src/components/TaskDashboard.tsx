@@ -96,6 +96,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [copyInviteHint, setCopyInviteHint] = useState<string | null>(null);
 
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [draftTopicFilter, setDraftTopicFilter] = useState("all");
+  const [draftDateFrom, setDraftDateFrom] = useState("");
+  const [draftDateTo, setDraftDateTo] = useState("");
+
   const loadTopics = useCallback(async () => {
     const r = await fetch("/api/topics");
     if (!r.ok) throw new Error("טעינת נושאים נכשלה");
@@ -228,7 +233,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       const k = e.key.toLowerCase();
       if (k !== "t" && k !== "n") return;
       if (isTypingContext(e.target)) return;
-      if (topicModal || taskModal || inviteModalOpen || topicsListModalOpen || editingTopicId) return;
+      if (topicModal || taskModal || inviteModalOpen || topicsListModalOpen || editingTopicId || filterModalOpen)
+        return;
 
       if (k === "t") {
         e.preventDefault();
@@ -248,6 +254,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     inviteModalOpen,
     topicsListModalOpen,
     editingTopicId,
+    filterModalOpen,
     openNewTopicModal,
     openNewTask,
   ]);
@@ -276,6 +283,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         setTopicsListModalOpen(false);
         return;
       }
+      if (filterModalOpen) {
+        e.preventDefault();
+        setFilterModalOpen(false);
+        return;
+      }
       if (taskModal) {
         e.preventDefault();
         setTaskModal(false);
@@ -283,7 +295,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inviteModalOpen, topicModal, editingTopicId, topicsListModalOpen, taskModal]);
+  }, [inviteModalOpen, topicModal, editingTopicId, topicsListModalOpen, filterModalOpen, taskModal]);
 
   const openEditTask = (t: TaskItem) => {
     setEditTaskId(t.id);
@@ -481,6 +493,34 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     return tasks.filter((x) => x.id !== editTaskId);
   }, [tasks, editTaskId]);
 
+  const openFilterModal = useCallback(() => {
+    setDraftTopicFilter(topicFilter);
+    setDraftDateFrom(dateFilterFrom);
+    setDraftDateTo(dateFilterTo);
+    setFilterModalOpen(true);
+  }, [topicFilter, dateFilterFrom, dateFilterTo]);
+
+  const applyTaskFilters = () => {
+    setTopicFilter(draftTopicFilter);
+    setDateFilterFrom(draftDateFrom);
+    setDateFilterTo(draftDateTo);
+    setFilterModalOpen(false);
+  };
+
+  const cancelFilterModal = () => {
+    setFilterModalOpen(false);
+  };
+
+  const removeAllTaskFilters = () => {
+    setTopicFilter("all");
+    setDateFilterFrom("");
+    setDateFilterTo("");
+    setDraftTopicFilter("all");
+    setDraftDateFrom("");
+    setDraftDateTo("");
+    setFilterModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center px-4 text-zinc-500">
@@ -608,72 +648,105 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex w-full flex-col gap-2 sm:w-auto">
-          <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 sm:flex-row sm:items-center sm:gap-3 dark:text-zinc-300">
-            <span className="shrink-0">סינון לפי נושא</span>
-            <select
-              value={topicFilter}
-              onChange={(e) => setTopicFilter(e.target.value)}
-              className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:min-w-[14rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
-            >
-              <option value="all">הכל</option>
-              <option value="none">ללא נושא</option>
-              {topics.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          {topicFilter !== "all" && topicFilter !== "none" && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
-            </p>
-          )}
-          <div className="flex w-full flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              סינון לפי טווח תאריכים (מועד לביצוע או לביצוע עד)
-            </span>
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-              <label className="flex w-full flex-col gap-1 text-sm text-zinc-700 sm:w-auto dark:text-zinc-300">
-                <span className="shrink-0">מתאריך</span>
-                <input
-                  type="date"
-                  value={dateFilterFrom}
-                  onChange={(e) => setDateFilterFrom(e.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:w-[11rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
-                />
+      {filterModalOpen && (
+        <div
+          className="fixed inset-0 z-[52] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && cancelFilterModal()}
+        >
+          <div className="my-auto w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">סינון מטלות</h3>
+            <div className="mt-4 flex flex-col gap-4">
+              <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <span>סינון לפי נושא</span>
+                <select
+                  value={draftTopicFilter}
+                  onChange={(e) => setDraftTopicFilter(e.target.value)}
+                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                >
+                  <option value="all">הכל</option>
+                  <option value="none">ללא נושא</option>
+                  {topics.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <label className="flex w-full flex-col gap-1 text-sm text-zinc-700 sm:w-auto dark:text-zinc-300">
-                <span className="shrink-0">עד תאריך</span>
-                <input
-                  type="date"
-                  value={dateFilterTo}
-                  onChange={(e) => setDateFilterTo(e.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:w-[11rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
-                />
-              </label>
-              {(dateFilterFrom || dateFilterTo) && (
+              {draftTopicFilter !== "all" && draftTopicFilter !== "none" && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
+                </p>
+              )}
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  סינון לפי טווח תאריכים (מועד לביצוע או לביצוע עד)
+                </span>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+                    <span>מתאריך</span>
+                    <input
+                      type="date"
+                      value={draftDateFrom}
+                      onChange={(e) => setDraftDateFrom(e.target.value)}
+                      className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                    />
+                  </label>
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+                    <span>עד תאריך</span>
+                    <input
+                      type="date"
+                      value={draftDateTo}
+                      onChange={(e) => setDraftDateTo(e.target.value)}
+                      className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={removeAllTaskFilters}
+                className="min-h-11 w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                הסר כל הסינונים
+              </button>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setDateFilterFrom("");
-                    setDateFilterTo("");
-                  }}
-                  className="min-h-11 w-full shrink-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 sm:mt-5 sm:w-auto dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  onClick={cancelFilterModal}
+                  className="min-h-11 w-full rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
-                  נקה טווח
+                  ביטול
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={applyTaskFilters}
+                  className="min-h-11 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
+                >
+                  החל
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <section className="flex flex-col gap-3 sm:gap-4">
         <div>
-          <h2 className="text-base font-semibold sm:text-lg">מטלות</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold sm:text-lg">מטלות</h2>
+            <button
+              type="button"
+              onClick={openFilterModal}
+              className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg leading-none shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              title="סינון מטלות"
+              aria-label="סינון מטלות"
+            >
+              🔍
+            </button>
+          </div>
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
             <input
               type="checkbox"
