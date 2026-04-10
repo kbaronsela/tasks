@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
+import { contrastOnBackground, resolveTopicColor } from "@/lib/topic-color";
 
 type User = { id: string; name: string; email: string };
 
 type Topic = {
   id: string;
   title: string;
+  color: string | null;
   createdAt: string;
   taskCount: number;
   users: User[];
@@ -23,10 +25,15 @@ type TaskItem = {
   scheduledAt: string | null;
   dueAt: string | null;
   createdAt: string;
-  topic: { id: string; title: string } | null;
+  topic: { id: string; title: string; color: string | null } | null;
   users: User[];
   prerequisites: { id: string; title: string; done: boolean }[];
 };
+
+function topicLabelStyle(topic: { id: string; color: string | null }) {
+  const bg = resolveTopicColor(topic);
+  return { backgroundColor: bg, color: contrastOnBackground(bg) } as const;
+}
 
 function toDatetimeLocalValue(iso: string | null): string {
   if (!iso) return "";
@@ -56,6 +63,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [topicModal, setTopicModal] = useState(false);
   const [topicTitle, setTopicTitle] = useState("");
   const [topicUserIds, setTopicUserIds] = useState<string[]>([]);
+  const [topicColorAuto, setTopicColorAuto] = useState(true);
+  const [topicColorHex, setTopicColorHex] = useState("#6366f1");
 
   const [taskModal, setTaskModal] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -70,6 +79,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editTopicTitle, setEditTopicTitle] = useState("");
   const [editTopicUserIds, setEditTopicUserIds] = useState<string[]>([]);
+  const [editTopicColorAuto, setEditTopicColorAuto] = useState(true);
+  const [editTopicColorHex, setEditTopicColorHex] = useState("#6366f1");
 
   const loadTopics = useCallback(async () => {
     const r = await fetch("/api/topics");
@@ -145,6 +156,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       body: JSON.stringify({
         title: topicTitle,
         userIds: topicUserIds.length ? topicUserIds : [user.id],
+        color: topicColorAuto ? null : topicColorHex,
       }),
     });
     if (!r.ok) {
@@ -155,6 +167,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTopicModal(false);
     setTopicTitle("");
     setTopicUserIds([]);
+    setTopicColorAuto(true);
+    setTopicColorHex("#6366f1");
     await loadTopics();
     setToast("הנושא נוצר בהצלחה");
     setTimeout(() => setToast(null), 3000);
@@ -247,6 +261,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setEditingTopicId(t.id);
     setEditTopicTitle(t.title);
     setEditTopicUserIds(t.users.map((u) => u.id));
+    const auto = !t.color;
+    setEditTopicColorAuto(auto);
+    setEditTopicColorHex(t.color ?? resolveTopicColor(t));
   };
 
   const submitEditTopic = async (e: React.FormEvent) => {
@@ -255,7 +272,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     const r = await fetch(`/api/topics/${editingTopicId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: editTopicTitle, userIds: editTopicUserIds }),
+      body: JSON.stringify({
+        title: editTopicTitle,
+        userIds: editTopicUserIds,
+        color: editTopicColorAuto ? null : editTopicColorHex,
+      }),
     });
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
@@ -304,6 +325,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             onClick={() => {
               setTopicUserIds([user.id]);
               setTopicTitle("");
+              setTopicColorAuto(true);
+              setTopicColorHex("#6366f1");
               setTopicModal(true);
             }}
             className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
@@ -336,21 +359,22 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           {topics.map((t) => (
             <div
               key={t.id}
-              className="flex w-full flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm sm:min-w-0 sm:max-w-full sm:flex-[1_1_16rem] dark:border-zinc-700 dark:bg-zinc-800"
+              className="flex w-full flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-zinc-200/80 px-3 py-2 text-sm sm:min-w-0 sm:max-w-full sm:flex-[1_1_16rem] dark:border-zinc-600"
+              style={topicLabelStyle(t)}
             >
               <span className="min-w-0 flex-1 break-words font-medium">{t.title}</span>
-              <span className="shrink-0 text-zinc-400">({t.taskCount})</span>
+              <span className="shrink-0 opacity-80">({t.taskCount})</span>
               <div className="flex w-full shrink-0 justify-end gap-2 sm:ml-auto sm:w-auto sm:justify-start">
                 <button
                   type="button"
-                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md px-2 py-1 text-indigo-600 hover:bg-indigo-50 hover:underline active:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-zinc-700"
+                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
                   onClick={() => openEditTopic(t)}
                 >
                   עריכה
                 </button>
                 <button
                   type="button"
-                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md px-2 py-1 text-red-600 hover:bg-red-50 hover:underline active:bg-red-100 dark:text-red-400 dark:hover:bg-zinc-700"
+                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium text-red-800 hover:bg-red-100/90 hover:underline active:bg-red-200/90 dark:text-red-200 dark:hover:bg-red-950/50"
                   onClick={() => deleteTopic(t.id)}
                 >
                   מחיקה
@@ -413,7 +437,10 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                         {t.title}
                       </span>
                       {t.topic && (
-                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-xs font-medium shadow-sm"
+                          style={topicLabelStyle(t.topic)}
+                        >
                           {t.topic.title}
                         </span>
                       )}
@@ -497,6 +524,29 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 onChange={(e) => setTopicTitle(e.target.value)}
                 className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  <input
+                    type="checkbox"
+                    checked={topicColorAuto}
+                    onChange={(e) => setTopicColorAuto(e.target.checked)}
+                    className="size-5 shrink-0"
+                  />
+                  צבע אוטומטי (האתר יבחר צבע ייחודי)
+                </label>
+                {!topicColorAuto && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      type="color"
+                      value={topicColorHex}
+                      onChange={(e) => setTopicColorHex(e.target.value)}
+                      className="h-11 w-16 min-w-[3.5rem] cursor-pointer rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600"
+                      aria-label="בחירת צבע לנושא"
+                    />
+                    <span className="font-mono text-sm text-zinc-600 dark:text-zinc-400">{topicColorHex}</span>
+                  </div>
+                )}
+              </div>
               <div>
                 <p className="mb-1 text-sm text-zinc-600">שיוך למשתמשים</p>
                 <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
@@ -675,6 +725,29 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 onChange={(e) => setEditTopicTitle(e.target.value)}
                 className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  <input
+                    type="checkbox"
+                    checked={editTopicColorAuto}
+                    onChange={(e) => setEditTopicColorAuto(e.target.checked)}
+                    className="size-5 shrink-0"
+                  />
+                  צבע אוטומטי (האתר יבחר צבע ייחודי)
+                </label>
+                {!editTopicColorAuto && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      type="color"
+                      value={editTopicColorHex}
+                      onChange={(e) => setEditTopicColorHex(e.target.value)}
+                      className="h-11 w-16 min-w-[3.5rem] cursor-pointer rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600"
+                      aria-label="בחירת צבע לנושא"
+                    />
+                    <span className="font-mono text-sm text-zinc-600 dark:text-zinc-400">{editTopicColorHex}</span>
+                  </div>
+                )}
+              </div>
               <div>
                 <p className="mb-1 text-sm text-zinc-600">שיוך למשתמשים</p>
                 <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">

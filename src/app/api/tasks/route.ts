@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const tasks = await prisma.task.findMany({
     where: { ...baseWhere, ...topicWhere },
     include: {
-      topic: { select: { id: true, title: true } },
+      topic: { select: { id: true, title: true, color: true } },
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   const full = await prisma.task.findUniqueOrThrow({
     where: { id: task.id },
     include: {
-      topic: { select: { id: true, title: true } },
+      topic: { select: { id: true, title: true, color: true } },
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },

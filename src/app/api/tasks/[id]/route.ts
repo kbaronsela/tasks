@@ -123,7 +123,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const full = await prisma.task.findUniqueOrThrow({
     where: { id },
     include: {
-      topic: { select: { id: true, title: true } },
+      topic: { select: { id: true, title: true, color: true } },
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },

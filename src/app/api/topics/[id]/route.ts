@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
+import { parseTopicColorInput } from "@/lib/topic-color";
 
 async function canAccessTopic(userId: string, topicId: string) {
   const row = await prisma.topicUser.findUnique({
@@ -18,18 +19,28 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
-  let body: { title?: string; userIds?: string[] };
+  let body: { title?: string; userIds?: string[]; color?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "גוף בקשה לא תקין" }, { status: 400 });
   }
 
-  const data: { title?: string } = {};
+  const data: { title?: string; color?: string | null } = {};
   if (body.title !== undefined) {
     const title = String(body.title).trim();
     if (!title) return NextResponse.json({ error: "כותרת ריקה" }, { status: 400 });
     data.title = title;
+  }
+
+  if (body.color !== undefined) {
+    const colorParsed = parseTopicColorInput(body.color);
+    if (colorParsed.kind === "error") {
+      return NextResponse.json({ error: colorParsed.error }, { status: 400 });
+    }
+    if (colorParsed.kind === "value") {
+      data.color = colorParsed.color;
+    }
   }
 
   if (body.userIds !== undefined) {
@@ -59,6 +70,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     topic: {
       id: topic.id,
       title: topic.title,
+      color: topic.color,
       createdAt: topic.createdAt,
       taskCount: topic._count.tasks,
       users: topic.users.map((u) => u.user),
