@@ -561,13 +561,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       </aside>
 
       <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
-        <header className="relative flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
-          <div className="min-w-0 pe-12 lg:pe-0">
+        <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
+          <div className="min-w-0 pe-14 lg:pe-0">
             <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
             <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
           </div>
 
-          <div className="absolute end-0 top-0 z-20 lg:hidden">
+          <div className="fixed end-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-40 lg:hidden">
             <div className="relative">
               <button
                 type="button"
