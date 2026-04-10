@@ -34,9 +34,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-center text-2xl font-bold">התחברות</h1>
+    <div className="flex min-h-dvh min-h-[100svh] flex-col items-center justify-center px-4 py-8 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
+        <h1 className="text-center text-xl font-bold sm:text-2xl">התחברות</h1>
         <p className="mt-2 text-center text-sm text-zinc-500">המטלות שלי</p>
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
           {error && (
@@ -52,7 +52,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+              className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
             />
           </label>
           <label className="block text-sm font-medium">
@@ -63,13 +63,13 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+              className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
             />
           </label>
           <button
             type="submit"
             disabled={pending}
-            className="rounded-xl bg-indigo-600 py-2.5 font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+            className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 py-2.5 text-base font-medium text-white hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-60"
           >
             {pending ? "מתחבר…" : "כניסה"}
           </button>

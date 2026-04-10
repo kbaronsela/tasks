@@ -278,20 +278,27 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-zinc-500">
+      <div className="flex min-h-[50dvh] items-center justify-center px-4 text-zinc-500">
         טוען…
       </div>
     );
   }
 
+  const btnPrimary =
+    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700";
+  const btnSecondary =
+    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800";
+  const btnGhost =
+    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800";
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <header className="flex flex-col gap-4 border-b border-zinc-200 pb-6 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">המטלות שלי</h1>
-          <p className="text-sm text-zinc-500">שלום, {user.name}</p>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
+      <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
+          <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-end sm:gap-2">
           <button
             type="button"
             onClick={() => {
@@ -299,22 +306,14 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               setTopicTitle("");
               setTopicModal(true);
             }}
-            className="rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800"
+            className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
           >
             נושא חדש
           </button>
-          <button
-            type="button"
-            onClick={openNewTask}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500"
-          >
+          <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
             מטלה חדשה
           </button>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-xl px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
+          <button type="button" onClick={logout} className={`${btnGhost} col-span-2 w-full sm:col-span-1 sm:w-auto`}>
             יציאה
           </button>
         </div>
@@ -331,30 +330,32 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-3 text-lg font-semibold">נושאים</h2>
-        <div className="flex flex-wrap gap-2">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="mb-3 text-base font-semibold sm:text-lg">נושאים</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
           {topics.map((t) => (
             <div
               key={t.id}
-              className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+              className="flex w-full flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm sm:min-w-0 sm:max-w-full sm:flex-[1_1_16rem] dark:border-zinc-700 dark:bg-zinc-800"
             >
-              <span className="font-medium">{t.title}</span>
-              <span className="text-zinc-400">({t.taskCount})</span>
-              <button
-                type="button"
-                className="text-indigo-600 hover:underline dark:text-indigo-400"
-                onClick={() => openEditTopic(t)}
-              >
-                עריכה
-              </button>
-              <button
-                type="button"
-                className="text-red-600 hover:underline dark:text-red-400"
-                onClick={() => deleteTopic(t.id)}
-              >
-                מחיקה
-              </button>
+              <span className="min-w-0 flex-1 break-words font-medium">{t.title}</span>
+              <span className="shrink-0 text-zinc-400">({t.taskCount})</span>
+              <div className="flex w-full shrink-0 justify-end gap-2 sm:ml-auto sm:w-auto sm:justify-start">
+                <button
+                  type="button"
+                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md px-2 py-1 text-indigo-600 hover:bg-indigo-50 hover:underline active:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-zinc-700"
+                  onClick={() => openEditTopic(t)}
+                >
+                  עריכה
+                </button>
+                <button
+                  type="button"
+                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md px-2 py-1 text-red-600 hover:bg-red-50 hover:underline active:bg-red-100 dark:text-red-400 dark:hover:bg-zinc-700"
+                  onClick={() => deleteTopic(t.id)}
+                >
+                  מחיקה
+                </button>
+              </div>
             </div>
           ))}
           {topics.length === 0 && (
@@ -363,13 +364,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          סינון לפי נושא
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 sm:w-auto sm:flex-row sm:items-center sm:gap-3 dark:text-zinc-300">
+          <span className="shrink-0">סינון לפי נושא</span>
           <select
             value={topicFilter}
             onChange={(e) => setTopicFilter(e.target.value)}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+            className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:min-w-[14rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
           >
             <option value="all">הכל</option>
             <option value="none">ללא נושא</option>
@@ -382,31 +383,33 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </label>
       </div>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">מטלות</h2>
+      <section className="flex flex-col gap-3 sm:gap-4">
+        <h2 className="text-base font-semibold sm:text-lg">מטלות</h2>
         <ul className="flex flex-col gap-3">
           {tasks.map((t) => {
             const prereqPending = t.prerequisites.some((p) => !p.done);
             return (
               <li
                 key={t.id}
-                className={`rounded-2xl border p-4 shadow-sm transition-colors ${
+                className={`rounded-2xl border p-3 shadow-sm transition-colors sm:p-4 ${
                   t.done
                     ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30"
                     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
                 }`}
               >
-                <div className="flex flex-wrap items-start gap-3">
+                <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     checked={t.done}
                     onChange={(e) => toggleDone(t, e.target.checked)}
-                    className="mt-1 size-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                    className="mt-1 size-6 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
                     aria-label="בוצע"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`text-lg font-semibold ${t.done ? "text-zinc-500 line-through" : ""}`}>
+                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <span
+                        className={`break-words text-base font-semibold sm:text-lg ${t.done ? "text-zinc-500 line-through" : ""}`}
+                      >
                         {t.title}
                       </span>
                       {t.topic && (
@@ -421,14 +424,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       )}
                     </div>
                     {t.description && (
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{t.description}</p>
+                      <p className="mt-1 break-words text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                        {t.description}
+                      </p>
                     )}
-                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-zinc-500">
-                      <span>מועד ביצוע: {formatHeDate(t.scheduledAt)}</span>
-                      <span>דד ליין: {formatHeDate(t.dueAt)}</span>
+                    <div className="mt-2 flex flex-col gap-1 text-xs text-zinc-500 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
+                      <span className="break-words">מועד ביצוע: {formatHeDate(t.scheduledAt)}</span>
+                      <span className="break-words">דד ליין: {formatHeDate(t.dueAt)}</span>
                     </div>
                     {t.prerequisites.length > 0 && (
-                      <div className="mt-2 text-sm">
+                      <div className="mt-2 break-words text-sm leading-relaxed">
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">תלויות: </span>
                         {t.prerequisites.map((p) => (
                           <span
@@ -440,27 +445,27 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                           </span>
                         ))}
                         {prereqPending && !t.done && (
-                          <span className="mr-2 text-amber-700 dark:text-amber-400">
+                          <span className="mt-1 block text-amber-700 sm:mr-2 sm:mt-0 sm:inline dark:text-amber-400">
                             (יש להשלים תלויות לפני הביצוע)
                           </span>
                         )}
                       </div>
                     )}
-                    <div className="mt-2 text-xs text-zinc-500">
+                    <div className="mt-2 break-words text-xs text-zinc-500">
                       משויכים: {t.users.map((u) => u.name).join(", ")}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-1 sm:gap-2">
                       <button
                         type="button"
                         onClick={() => openEditTask(t)}
-                        className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                        className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 hover:underline active:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-zinc-800"
                       >
                         עריכה
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteTask(t.id)}
-                        className="text-sm font-medium text-red-600 hover:underline"
+                        className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:underline active:bg-red-100 dark:hover:bg-zinc-800"
                       >
                         מחיקה
                       </button>
@@ -477,22 +482,26 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       </section>
 
       {topicModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold">נושא חדש</h3>
+        <div
+          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setTopicModal(false)}
+        >
+          <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">נושא חדש</h3>
             <form onSubmit={submitTopic} className="mt-4 flex flex-col gap-3">
               <input
                 required
                 placeholder="שם הנושא"
                 value={topicTitle}
                 onChange={(e) => setTopicTitle(e.target.value)}
-                className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               <div>
                 <p className="mb-1 text-sm text-zinc-600">שיוך למשתמשים</p>
-                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
                   {allUsers.map((u) => (
-                    <label key={u.id} className="flex items-center gap-2 text-sm">
+                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
                       <input
                         type="checkbox"
                         checked={topicUserIds.includes(u.id)}
@@ -501,23 +510,26 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                             prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
                           )
                         }
+                        className="size-5 shrink-0"
                       />
-                      {u.name} ({u.email})
+                      <span className="min-w-0 break-words">
+                        {u.name} ({u.email})
+                      </span>
                     </label>
                   ))}
                 </div>
               </div>
-              <div className="mt-2 flex justify-end gap-2">
+              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setTopicModal(false)}
-                  className="rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
                   ביטול
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
                 >
                   שמירה
                 </button>
@@ -528,30 +540,36 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       )}
 
       {taskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold">{editTaskId ? "עריכת מטלה" : "מטלה חדשה"}</h3>
+        <div
+          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setTaskModal(false)}
+        >
+          <div className="my-auto w-full max-w-lg max-h-[min(92dvh,840px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">
+              {editTaskId ? "עריכת מטלה" : "מטלה חדשה"}
+            </h3>
             <form onSubmit={submitTask} className="mt-4 flex flex-col gap-3">
               <input
                 required
                 placeholder="כותרת"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
-                className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               <textarea
                 placeholder="תיאור (אופציונלי)"
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
                 rows={3}
-                className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                className="min-h-[5rem] w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               <label className="text-sm">
                 נושא
                 <select
                   value={taskTopicId}
                   onChange={(e) => setTaskTopicId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                 >
                   <option value="">ללא נושא</option>
                   {topics.map((t) => (
@@ -567,7 +585,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   type="datetime-local"
                   value={taskScheduled}
                   onChange={(e) => setTaskScheduled(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                 />
               </label>
               <label className="text-sm">
@@ -576,14 +594,14 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   type="datetime-local"
                   value={taskDue}
                   onChange={(e) => setTaskDue(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                 />
               </label>
               <div>
                 <p className="mb-1 text-sm text-zinc-600">משויכים למטלה</p>
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
                   {allUsers.map((u) => (
-                    <label key={u.id} className="flex items-center gap-2 text-sm">
+                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
                       <input
                         type="checkbox"
                         checked={taskUserIds.includes(u.id)}
@@ -592,17 +610,18 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                             prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
                           )
                         }
+                        className="size-5 shrink-0"
                       />
-                      {u.name}
+                      <span className="min-w-0 break-words">{u.name}</span>
                     </label>
                   ))}
                 </div>
               </div>
               <div>
                 <p className="mb-1 text-sm text-zinc-600">תלויות (יש להשלים לפני המטלה הנוכחית)</p>
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
                   {prereqOptions.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 text-sm">
+                    <label key={p.id} className="flex min-h-11 cursor-pointer items-start gap-2 text-sm touch-manipulation">
                       <input
                         type="checkbox"
                         checked={taskPrereqIds.includes(p.id)}
@@ -611,8 +630,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                             prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
                           )
                         }
+                        className="mt-0.5 size-5 shrink-0"
                       />
-                      {p.title}
+                      <span className="min-w-0 break-words">{p.title}</span>
                     </label>
                   ))}
                   {prereqOptions.length === 0 && (
@@ -620,17 +640,17 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   )}
                 </div>
               </div>
-              <div className="mt-2 flex justify-end gap-2">
+              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setTaskModal(false)}
-                  className="rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
                   ביטול
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
                 >
                   שמירה
                 </button>
@@ -641,21 +661,25 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       )}
 
       {editingTopicId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold">עריכת נושא</h3>
+        <div
+          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setEditingTopicId(null)}
+        >
+          <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">עריכת נושא</h3>
             <form onSubmit={submitEditTopic} className="mt-4 flex flex-col gap-3">
               <input
                 required
                 value={editTopicTitle}
                 onChange={(e) => setEditTopicTitle(e.target.value)}
-                className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               <div>
                 <p className="mb-1 text-sm text-zinc-600">שיוך למשתמשים</p>
-                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
                   {allUsers.map((u) => (
-                    <label key={u.id} className="flex items-center gap-2 text-sm">
+                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
                       <input
                         type="checkbox"
                         checked={editTopicUserIds.includes(u.id)}
@@ -664,23 +688,24 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                             prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
                           )
                         }
+                        className="size-5 shrink-0"
                       />
-                      {u.name}
+                      <span className="min-w-0 break-words">{u.name}</span>
                     </label>
                   ))}
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setEditingTopicId(null)}
-                  className="rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
                   ביטול
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
                 >
                   שמירה
                 </button>
