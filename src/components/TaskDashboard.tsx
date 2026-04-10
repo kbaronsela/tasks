@@ -752,11 +752,23 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             <button
               type="button"
               onClick={openFilterModal}
-              className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg leading-none shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
               title="סינון מטלות"
               aria-label="סינון מטלות"
             >
-              🎛️
+              <svg
+                viewBox="0 0 24 24"
+                className="size-[1.125rem] shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden
+              >
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="6" y1="12" x2="18" y2="12" />
+                <line x1="9" y1="18" x2="15" y2="18" />
+              </svg>
             </button>
           </div>
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
