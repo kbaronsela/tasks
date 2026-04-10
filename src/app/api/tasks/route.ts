@@ -9,6 +9,30 @@ function parseDate(s: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** למיון: התאריך המוקדם מבין מועד ביצוע לדד־ליין; אם אחד בלבד — הוא */
+function effectiveSortMs(task: { scheduledAt: Date | null; dueAt: Date | null }): number | null {
+  const s = task.scheduledAt?.getTime();
+  const d = task.dueAt?.getTime();
+  if (s != null && d != null) return Math.min(s, d);
+  if (d != null) return d;
+  if (s != null) return s;
+  return null;
+}
+
+function sortTasksBySchedule<T extends { scheduledAt: Date | null; dueAt: Date | null; createdAt: Date }>(
+  tasks: T[]
+): T[] {
+  return [...tasks].sort((a, b) => {
+    const ka = effectiveSortMs(a);
+    const kb = effectiveSortMs(b);
+    if (ka == null && kb == null) return b.createdAt.getTime() - a.createdAt.getTime();
+    if (ka == null) return 1;
+    if (kb == null) return -1;
+    if (ka !== kb) return ka - kb;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+}
+
 export async function GET(req: NextRequest) {
   const { session, response } = await requireUser();
   if (!session) return response!;
@@ -26,15 +50,16 @@ export async function GET(req: NextRequest) {
     topicWhere = { topicId: topicFilter };
   }
 
-  const tasks = await prisma.task.findMany({
+  const raw = await prisma.task.findMany({
     where: { ...baseWhere, ...topicWhere },
     include: {
       topic: { select: { id: true, title: true, color: true } },
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },
-    orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
   });
+
+  const tasks = sortTasksBySchedule(raw);
 
   return NextResponse.json({
     tasks: tasks.map((t) => ({

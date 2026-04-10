@@ -457,7 +457,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     )}
                     <div className="mt-2 flex flex-col gap-1 text-xs text-zinc-500 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
                       <span className="break-words">מועד ביצוע: {formatHeDate(t.scheduledAt)}</span>
-                      <span className="break-words">דד ליין: {formatHeDate(t.dueAt)}</span>
+                      <span className="break-words">לביצוע עד: {formatHeDate(t.dueAt)}</span>
                     </div>
                     {t.prerequisites.length > 0 && (
                       <div className="mt-2 break-words text-sm leading-relaxed">
@@ -605,6 +605,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 placeholder="כותרת"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
+                autoFocus={!editTaskId}
                 className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               <textarea
@@ -639,7 +640,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 />
               </label>
               <label className="text-sm">
-                דד ליין
+                לביצוע עד
                 <input
                   type="datetime-local"
                   value={taskDue}
