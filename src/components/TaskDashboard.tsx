@@ -562,7 +562,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
       <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
         <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
-          <div className="min-w-0 pe-14 lg:pe-0">
+          <div className="min-w-0 ps-[4.75rem] lg:ps-0">
             <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
             <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
           </div>
@@ -654,8 +654,28 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           role="presentation"
           onClick={(e) => e.target === e.currentTarget && cancelFilterModal()}
         >
-          <div className="my-auto w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">סינון מטלות</h3>
+          <div className="relative my-auto w-full max-w-md max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <button
+                type="button"
+                onClick={cancelFilterModal}
+                className="absolute left-0 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                aria-label="סגור"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+              <h3 className="text-center text-base font-semibold sm:text-lg">סינון מטלות</h3>
+            </div>
             <div className="mt-4 flex flex-col gap-4">
               <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 <span>סינון לפי נושא</span>
@@ -724,14 +744,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               >
                 הסר כל הסינונים
               </button>
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2">
-                <button
-                  type="button"
-                  onClick={cancelFilterModal}
-                  className="min-h-11 w-full rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
-                >
-                  ביטול
-                </button>
+              <div className="flex justify-stretch sm:justify-end">
                 <button
                   type="button"
                   onClick={applyTaskFilters}
