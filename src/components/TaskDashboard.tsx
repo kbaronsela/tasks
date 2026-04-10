@@ -668,7 +668,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               )}
             </div>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        </div>
+      </div>
+
+      <section className="flex flex-col gap-3 sm:gap-4">
+        <div>
+          <h2 className="text-base font-semibold sm:text-lg">מטלות</h2>
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
             <input
               type="checkbox"
               checked={showCompletedTasks}
@@ -678,10 +684,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             הצג גם מטלות שבוצעו (בסוף הרשימה)
           </label>
         </div>
-      </div>
-
-      <section className="flex flex-col gap-3 sm:gap-4">
-        <h2 className="text-base font-semibold sm:text-lg">מטלות</h2>
         <ul className="flex flex-col gap-3">
           {tasks.map((t) => {
             const prereqPending = t.prerequisites.some((p) => !p.done);
