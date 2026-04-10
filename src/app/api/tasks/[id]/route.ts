@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
 import { wouldCreateDependencyCycle } from "@/lib/dependency-graph";
+import { toTaskApiJson } from "@/lib/task-api-map";
 
 function parseDate(s: string | null): Date | null {
   if (s === null || s === "") return null;
@@ -130,23 +131,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   });
 
   return NextResponse.json({
-    task: {
-      id: full.id,
-      title: full.title,
-      description: full.description,
-      done: full.done,
-      doneAt: full.doneAt,
-      scheduledAt: full.scheduledAt,
-      dueAt: full.dueAt,
-      createdAt: full.createdAt,
-      topic: full.topic,
-      users: full.users.map((u) => u.user),
-      prerequisites: full.dependsOn.map((d) => ({
-        id: d.dependsOn.id,
-        title: d.dependsOn.title,
-        done: d.dependsOn.done,
-      })),
-    },
+    task: toTaskApiJson(full, session.userId),
   });
 }
 

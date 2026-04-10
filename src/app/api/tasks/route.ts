@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
 import { wouldCreateDependencyCycle } from "@/lib/dependency-graph";
+import { toTaskApiJson, type TaskApiInclude } from "@/lib/task-api-map";
 
 function parseDate(s: string | null | undefined): Date | null {
   if (!s) return null;
@@ -39,6 +40,36 @@ export async function GET(req: NextRequest) {
 
   const topicFilter = req.nextUrl.searchParams.get("topic") ?? "all";
 
+  const include: TaskApiInclude = {
+    topic: { select: { id: true, title: true, color: true } },
+    users: { include: { user: { select: { id: true, name: true, email: true } } } },
+    dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
+  };
+
+  const isSpecificTopic =
+    topicFilter !== "all" && topicFilter !== "none" && topicFilter.length > 0;
+
+  if (isSpecificTopic) {
+    const access = await prisma.topicUser.findUnique({
+      where: {
+        topicId_userId: { topicId: topicFilter, userId: session.userId },
+      },
+    });
+    if (!access) {
+      return NextResponse.json({ error: "אין גישה לנושא" }, { status: 403 });
+    }
+
+    const raw = await prisma.task.findMany({
+      where: { topicId: topicFilter },
+      include,
+    });
+
+    const tasks = sortTasksBySchedule(raw);
+    return NextResponse.json({
+      tasks: tasks.map((t) => toTaskApiJson(t, session.userId)),
+    });
+  }
+
   const baseWhere = {
     users: { some: { userId: session.userId } },
   };
@@ -46,39 +77,17 @@ export async function GET(req: NextRequest) {
   let topicWhere: Record<string, unknown> = {};
   if (topicFilter === "none") {
     topicWhere = { topicId: null };
-  } else if (topicFilter !== "all" && topicFilter.length > 0) {
-    topicWhere = { topicId: topicFilter };
   }
 
   const raw = await prisma.task.findMany({
     where: { ...baseWhere, ...topicWhere },
-    include: {
-      topic: { select: { id: true, title: true, color: true } },
-      users: { include: { user: { select: { id: true, name: true, email: true } } } },
-      dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
-    },
+    include,
   });
 
   const tasks = sortTasksBySchedule(raw);
 
   return NextResponse.json({
-    tasks: tasks.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      done: t.done,
-      doneAt: t.doneAt,
-      scheduledAt: t.scheduledAt,
-      dueAt: t.dueAt,
-      createdAt: t.createdAt,
-      topic: t.topic,
-      users: t.users.map((u) => u.user),
-      prerequisites: t.dependsOn.map((d) => ({
-        id: d.dependsOn.id,
-        title: d.dependsOn.title,
-        done: d.dependsOn.done,
-      })),
-    })),
+    tasks: tasks.map((t) => toTaskApiJson(t, session.userId)),
   });
 }
 
@@ -171,22 +180,6 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({
-    task: {
-      id: full.id,
-      title: full.title,
-      description: full.description,
-      done: full.done,
-      doneAt: full.doneAt,
-      scheduledAt: full.scheduledAt,
-      dueAt: full.dueAt,
-      createdAt: full.createdAt,
-      topic: full.topic,
-      users: full.users.map((u) => u.user),
-      prerequisites: full.dependsOn.map((d) => ({
-        id: d.dependsOn.id,
-        title: d.dependsOn.title,
-        done: d.dependsOn.done,
-      })),
-    },
+    task: toTaskApiJson(full, session.userId),
   });
 }

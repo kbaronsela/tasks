@@ -27,6 +27,7 @@ type TaskItem = {
   createdAt: string;
   topic: { id: string; title: string; color: string | null } | null;
   users: User[];
+  assignedToMe: boolean;
   prerequisites: { id: string; title: string; done: boolean }[];
 };
 
@@ -210,6 +211,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   };
 
   const toggleDone = async (t: TaskItem, next: boolean) => {
+    if (!t.assignedToMe) return;
     setError(null);
     const r = await fetch(`/api/tasks/${t.id}`, {
       method: "PATCH",
@@ -390,22 +392,29 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       </section>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 sm:w-auto sm:flex-row sm:items-center sm:gap-3 dark:text-zinc-300">
-          <span className="shrink-0">סינון לפי נושא</span>
-          <select
-            value={topicFilter}
-            onChange={(e) => setTopicFilter(e.target.value)}
-            className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:min-w-[14rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
-          >
-            <option value="all">הכל</option>
-            <option value="none">ללא נושא</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex w-full flex-col gap-2 sm:w-auto">
+          <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 sm:flex-row sm:items-center sm:gap-3 dark:text-zinc-300">
+            <span className="shrink-0">סינון לפי נושא</span>
+            <select
+              value={topicFilter}
+              onChange={(e) => setTopicFilter(e.target.value)}
+              className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:min-w-[14rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
+            >
+              <option value="all">הכל</option>
+              <option value="none">ללא נושא</option>
+              {topics.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {topicFilter !== "all" && topicFilter !== "none" && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
+            </p>
+          )}
+        </div>
       </div>
 
       <section className="flex flex-col gap-3 sm:gap-4">
@@ -413,22 +422,25 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         <ul className="flex flex-col gap-3">
           {tasks.map((t) => {
             const prereqPending = t.prerequisites.some((p) => !p.done);
+            const assignedToMe = t.assignedToMe ?? true;
+            const cardClass = !assignedToMe
+              ? t.done
+                ? "rounded-2xl border border-dashed border-emerald-400/80 bg-emerald-50/70 p-3 opacity-95 shadow-sm transition-colors sm:p-4 dark:border-emerald-800 dark:bg-emerald-950/40"
+                : "rounded-2xl border border-dashed border-amber-400/90 bg-amber-50/55 p-3 shadow-sm transition-colors sm:p-4 dark:border-amber-700 dark:bg-amber-950/35"
+              : t.done
+                ? "rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 shadow-sm transition-colors sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30"
+                : "rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition-colors sm:p-4 dark:border-zinc-800 dark:bg-zinc-900";
             return (
-              <li
-                key={t.id}
-                className={`rounded-2xl border p-3 shadow-sm transition-colors sm:p-4 ${
-                  t.done
-                    ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30"
-                    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-                }`}
-              >
+              <li key={t.id} className={cardClass}>
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     checked={t.done}
+                    disabled={!assignedToMe}
                     onChange={(e) => toggleDone(t, e.target.checked)}
-                    className="mt-1 size-6 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                    aria-label="בוצע"
+                    title={assignedToMe ? undefined : "רק משויכים למטלה יכולים לסמן ביצוע"}
+                    className="mt-1 size-6 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={assignedToMe ? "בוצע" : "בוצע — לא משויך אלייך"}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -437,6 +449,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       >
                         {t.title}
                       </span>
+                      {!assignedToMe && (
+                        <span className="rounded-full border border-amber-300 bg-amber-100/95 px-2 py-0.5 text-xs font-medium text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+                          לא משויך אליי
+                        </span>
+                      )}
                       {t.topic && (
                         <span
                           className="rounded-full px-2 py-0.5 text-xs font-medium shadow-sm"
@@ -482,22 +499,24 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     <div className="mt-2 break-words text-xs text-zinc-500">
                       משויכים: {t.users.map((u) => u.name).join(", ")}
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-1 sm:gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditTask(t)}
-                        className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 hover:underline active:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-zinc-800"
-                      >
-                        עריכה
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteTask(t.id)}
-                        className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:underline active:bg-red-100 dark:hover:bg-zinc-800"
-                      >
-                        מחיקה
-                      </button>
-                    </div>
+                    {assignedToMe && (
+                      <div className="mt-3 flex flex-wrap gap-1 sm:gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditTask(t)}
+                          className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 hover:underline active:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-zinc-800"
+                        >
+                          עריכה
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteTask(t.id)}
+                          className="min-h-9 min-w-[44px] touch-manipulation rounded-lg px-2 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:underline active:bg-red-100 dark:hover:bg-zinc-800"
+                        >
+                          מחיקה
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </li>
