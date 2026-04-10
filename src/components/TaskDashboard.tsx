@@ -388,27 +388,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
           <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-end sm:gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setTopicUserIds([user.id]);
-              setTopicTitle("");
-              setTopicColorAuto(true);
-              setTopicColorHex("#6366f1");
-              setTopicModal(true);
-            }}
-            className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
-          >
-            נושא חדש
-          </button>
-          <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
-            מטלה חדשה
-          </button>
-          <button type="button" onClick={logout} className={`${btnGhost} col-span-1 w-full sm:w-auto`}>
-            יציאה
-          </button>
-          <div className="relative col-span-1 flex justify-end sm:col-span-1">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-start sm:gap-2">
+          <div className="relative col-span-1 flex justify-start sm:col-span-1">
             <button
               type="button"
               onClick={() => setMoreMenuOpen((o) => !o)}
@@ -428,7 +409,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   onClick={() => setMoreMenuOpen(false)}
                 />
                 <div
-                  className="absolute end-0 top-full z-40 mt-1 min-w-[11rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  className="absolute start-0 top-full z-40 mt-1 min-w-[11rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                   role="menu"
                 >
                   <button
@@ -446,6 +427,25 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               </>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setTopicUserIds([user.id]);
+              setTopicTitle("");
+              setTopicColorAuto(true);
+              setTopicColorHex("#6366f1");
+              setTopicModal(true);
+            }}
+            className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
+          >
+            נושא חדש
+          </button>
+          <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
+            מטלה חדשה
+          </button>
+          <button type="button" onClick={logout} className={`${btnGhost} col-span-1 w-full sm:w-auto`}>
+            יציאה
+          </button>
         </div>
       </header>
 
