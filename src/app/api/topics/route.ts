@@ -17,19 +17,20 @@ export async function GET() {
       },
       _count: { select: { tasks: true } },
     },
-    orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({
-    topics: topics.map((t) => ({
-      id: t.id,
-      title: t.title,
-      color: t.color,
-      createdAt: t.createdAt,
-      taskCount: t._count.tasks,
-      users: t.users.map((u) => u.user),
-    })),
-  });
+  const mapped = topics.map((t) => ({
+    id: t.id,
+    title: t.title,
+    color: t.color,
+    createdAt: t.createdAt,
+    taskCount: t._count.tasks,
+    users: t.users.map((u) => u.user),
+  }));
+
+  mapped.sort((a, b) => a.title.localeCompare(b.title, "he", { sensitivity: "base" }));
+
+  return NextResponse.json({ topics: mapped });
 }
 
 export async function POST(req: NextRequest) {

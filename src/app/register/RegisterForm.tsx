@@ -25,9 +25,14 @@ export function RegisterForm() {
       const r = await fetch(`/api/invitations/validate?token=${encodeURIComponent(token)}`);
       const data = await r.json().catch(() => ({}));
       if (cancelled) return;
-      if (data.valid && data.email) {
-        setEmail(String(data.email).toLowerCase());
-        setEmailLocked(true);
+      if (data.valid) {
+        if (data.email) {
+          setEmail(String(data.email).toLowerCase());
+          setEmailLocked(true);
+        } else {
+          setEmail("");
+          setEmailLocked(false);
+        }
         setInviteError(null);
       } else {
         setInviteToken(null);

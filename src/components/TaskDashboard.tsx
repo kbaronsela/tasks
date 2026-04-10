@@ -87,11 +87,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [editTopicColorAuto, setEditTopicColorAuto] = useState(true);
   const [editTopicColorHex, setEditTopicColorHex] = useState("#6366f1");
 
-  const [inviteEmailsRaw, setInviteEmailsRaw] = useState("");
   const [inviteSending, setInviteSending] = useState(false);
-  const [inviteResults, setInviteResults] = useState<
-    { email: string; ok: boolean; emailSent?: boolean; inviteUrl?: string; error?: string }[] | null
-  >(null);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [copyInviteHint, setCopyInviteHint] = useState<string | null>(null);
@@ -143,6 +140,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       cancelled = true;
     };
   }, [loadTopics, loadTasks, loadUsers]);
+
+  useEffect(() => {
+    if (inviteModalOpen) {
+      setInviteUrl(null);
+      setCopyInviteHint(null);
+    }
+  }, [inviteModalOpen]);
 
   const openNewTask = useCallback(() => {
     setEditTaskId(null);
@@ -427,39 +431,31 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const submitInvites = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setInviteResults(null);
+    setInviteUrl(null);
     setCopyInviteHint(null);
     setInviteSending(true);
     try {
       const r = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailsRaw: inviteEmailsRaw }),
+        body: "{}",
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        setError(data.error ?? "שליחת הזמנות נכשלה");
+        setError(data.error ?? "יצירת קישור הזמנה נכשלה");
         return;
       }
-      setInviteResults(data.results ?? []);
-      setInviteEmailsRaw("");
+      const url = typeof data.inviteUrl === "string" ? data.inviteUrl : null;
+      setInviteUrl(url);
     } finally {
       setInviteSending(false);
     }
   };
 
   const inviteTextToCopy = useMemo(() => {
-    if (!inviteResults?.length) return "";
-    const blocks: string[] = [];
-    for (const row of inviteResults) {
-      if (row.ok && row.inviteUrl) {
-        blocks.push(
-          `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול המטלות.\n\nלהרשמה (לכתובת ${row.email}):\n${row.inviteUrl}\n\nהקישור תקף למספר ימים.`
-        );
-      }
-    }
-    return blocks.join("\n\n──────────\n\n");
-  }, [inviteResults, user.name]);
+    if (!inviteUrl) return "";
+    return `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול המטלות.\n\nלהרשמה:\n${inviteUrl}\n\nהקישור תקף למספר ימים.`;
+  }, [inviteUrl, user.name]);
 
   const copyInviteText = async () => {
     if (!inviteTextToCopy) return;
@@ -759,68 +755,41 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           <div className="my-auto w-full max-w-lg max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
             <h3 className="text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
             <p className="mt-2 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">
-              {`יש להזין כתובת מייל אחת או כמה (פסיק, רווח או שורה חדשה).
-אחרי יצירת ההזמנה ניתן להעתיק טקסט מוכן לשליחה (ווטסאפ / מייל).`}
+              {`נוצר קישור הזמנה אחד לכל מי שתשלחי אליו.
+אחרי יצירת הקישור ניתן להעתיק טקסט מוכן לשליחה (ווטסאפ / מייל) — ללא כתובת מייל בטקסט.`}
             </p>
             <form onSubmit={submitInvites} className="mt-4 flex flex-col gap-3">
-              <textarea
-                value={inviteEmailsRaw}
-                onChange={(e) => setInviteEmailsRaw(e.target.value)}
-                placeholder="friend@mail.com, other@gmail.com"
-                rows={3}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-              />
               <button
                 type="submit"
-                disabled={inviteSending || !inviteEmailsRaw.trim()}
+                disabled={inviteSending}
                 className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto"
               >
-                {inviteSending ? "יוצר…" : "צור קישורי הזמנה"}
+                {inviteSending ? "יוצר…" : "צור קישור הזמנה"}
               </button>
             </form>
-            {inviteResults && inviteResults.length > 0 && (
+            {inviteUrl && (
               <div className="mt-4 space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-                <ul className="space-y-1.5 text-sm">
-                  {inviteResults.map((row, i) => (
-                    <li
-                      key={`${row.email}-${i}`}
-                      className={row.ok ? "text-emerald-800 dark:text-emerald-200" : "text-red-700 dark:text-red-300"}
-                    >
-                      <span className="font-medium">{row.email}</span>
-                      {!row.ok && row.error && ` — ${row.error}`}
-                      {row.ok && row.emailSent && " — נשלח מייל (אם הוגדר SMTP)"}
-                    </li>
-                  ))}
-                </ul>
-                {inviteTextToCopy ? (
-                  <>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      טקסט להעתקה
-                    </label>
-                    <textarea
-                      readOnly
-                      value={inviteTextToCopy}
-                      rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
-                      className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={copyInviteText}
-                        className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-                      >
-                        העתק טקסט
-                      </button>
-                      {copyInviteHint && (
-                        <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  inviteResults.some((r) => r.ok) && (
-                    <p className="text-sm text-zinc-500">לא נוצרו קישורים תקינים להעתקה.</p>
-                  )
-                )}
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  טקסט להעתקה
+                </label>
+                <textarea
+                  readOnly
+                  value={inviteTextToCopy}
+                  rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
+                  className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyInviteText}
+                    className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                  >
+                    העתק טקסט
+                  </button>
+                  {copyInviteHint && (
+                    <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
+                  )}
+                </div>
               </div>
             )}
             <div className="mt-4 flex justify-end">

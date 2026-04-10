@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     if (!inv || inv.usedAt || inv.expiresAt < new Date()) {
       return NextResponse.json({ error: "ההזמנה לא תקפה או שפגה" }, { status: 400 });
     }
-    if (inv.email !== email) {
+    if (inv.email != null && inv.email !== email) {
       return NextResponse.json({ error: "האימייל חייב להתאים לכתובת בהזמנה" }, { status: 400 });
     }
     invitationId = inv.id;

@@ -22,7 +22,8 @@ model User {
 
 model Invitation {
   id          String    @id @default(cuid())
-  email       String
+  /// null = הזמנה גנרית (קישור אחד לכולם), אחרת מייל ספציפי
+  email       String?
   token       String    @unique
   expiresAt   DateTime
   invitedById String
