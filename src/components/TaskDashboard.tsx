@@ -78,11 +78,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [taskUserIds, setTaskUserIds] = useState<string[]>([]);
   const [taskPrereqIds, setTaskPrereqIds] = useState<string[]>([]);
 
-  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
-  const [editTopicTitle, setEditTopicTitle] = useState("");
-  const [editTopicUserIds, setEditTopicUserIds] = useState<string[]>([]);
-  const [editTopicColorAuto, setEditTopicColorAuto] = useState(true);
-  const [editTopicColorHex, setEditTopicColorHex] = useState("#6366f1");
+  const [topicModalForTask, setTopicModalForTask] = useState(false);
 
   const [inviteEmailsRaw, setInviteEmailsRaw] = useState("");
   const [inviteSending, setInviteSending] = useState(false);
@@ -154,6 +150,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   }, [user.id]);
 
   const openNewTopicModal = useCallback(() => {
+    setTopicModalForTask(false);
+    setTopicUserIds([user.id]);
+    setTopicTitle("");
+    setTopicColorAuto(true);
+    setTopicColorHex("#6366f1");
+    setTopicModal(true);
+  }, [user.id]);
+
+  const openTopicModalFromTask = useCallback(() => {
+    setTopicModalForTask(true);
     setTopicUserIds([user.id]);
     setTopicTitle("");
     setTopicColorAuto(true);
@@ -179,7 +185,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       const k = e.key.toLowerCase();
       if (k !== "t" && k !== "n") return;
       if (isTypingContext(e.target)) return;
-      if (topicModal || taskModal || inviteModalOpen || editingTopicId !== null) return;
+      if (topicModal || taskModal || inviteModalOpen) return;
 
       if (k === "t") {
         e.preventDefault();
@@ -192,15 +198,30 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [
-    loading,
-    topicModal,
-    taskModal,
-    inviteModalOpen,
-    editingTopicId,
-    openNewTopicModal,
-    openNewTask,
-  ]);
+  }, [loading, topicModal, taskModal, inviteModalOpen, openNewTopicModal, openNewTask]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (inviteModalOpen) {
+        e.preventDefault();
+        setInviteModalOpen(false);
+        return;
+      }
+      if (topicModal) {
+        e.preventDefault();
+        setTopicModal(false);
+        setTopicModalForTask(false);
+        return;
+      }
+      if (taskModal) {
+        e.preventDefault();
+        setTaskModal(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inviteModalOpen, topicModal, taskModal]);
 
   const openEditTask = (t: TaskItem) => {
     setEditTaskId(t.id);
@@ -217,6 +238,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const submitTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const linkingToTask = topicModalForTask;
     const r = await fetch("/api/topics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -226,18 +248,25 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         color: topicColorAuto ? null : topicColorHex,
       }),
     });
+    const data = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      setError(j.error ?? "שמירה נכשלה");
+      setError(data.error ?? "שמירה נכשלה");
       return;
     }
+    const newId = data.topic?.id as string | undefined;
     setTopicModal(false);
+    setTopicModalForTask(false);
     setTopicTitle("");
     setTopicUserIds([]);
     setTopicColorAuto(true);
     setTopicColorHex("#6366f1");
     await loadTopics();
-    setToast("הנושא נוצר בהצלחה");
+    if (linkingToTask && newId) {
+      setTaskTopicId(newId);
+      setToast("הנושא נוסף למטלה");
+    } else {
+      setToast("הנושא נוצר בהצלחה");
+    }
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -311,49 +340,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     }
     await loadTasks();
     await loadTopics();
-  };
-
-  const deleteTopic = async (id: string) => {
-    if (!confirm("למחוק את הנושא? המטלות יישארו ללא נושא.")) return;
-    const r = await fetch(`/api/topics/${id}`, { method: "DELETE" });
-    if (!r.ok) {
-      setError("מחיקה נכשלה");
-      return;
-    }
-    if (topicFilter === id) setTopicFilter("all");
-    await loadTopics();
-    await loadTasks();
-  };
-
-  const openEditTopic = (t: Topic) => {
-    setEditingTopicId(t.id);
-    setEditTopicTitle(t.title);
-    setEditTopicUserIds(t.users.map((u) => u.id));
-    const auto = !t.color;
-    setEditTopicColorAuto(auto);
-    setEditTopicColorHex(t.color ?? resolveTopicColor(t));
-  };
-
-  const submitEditTopic = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTopicId) return;
-    const r = await fetch(`/api/topics/${editingTopicId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: editTopicTitle,
-        userIds: editTopicUserIds,
-        color: editTopicColorAuto ? null : editTopicColorHex,
-      }),
-    });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      setError(j.error ?? "שמירה נכשלה");
-      return;
-    }
-    setEditingTopicId(null);
-    await loadTopics();
-    await loadTasks();
   };
 
   const logout = async () => {
@@ -510,15 +496,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             </div>
           </div>
 
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-start sm:gap-2 lg:w-auto">
-            <button
-              type="button"
-              onClick={openNewTopicModal}
-              className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
-            >
-              נושא חדש
-            </button>
-            <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
+          <div className="flex w-full flex-shrink-0 justify-start sm:w-auto">
+            <button type="button" onClick={openNewTask} className={`${btnPrimary} w-full sm:w-auto`}>
               מטלה חדשה
             </button>
           </div>
@@ -534,41 +513,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           {toast}
         </div>
       )}
-
-      <section className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-3 text-base font-semibold sm:text-lg">נושאים</h2>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
-          {topics.map((t) => (
-            <div
-              key={t.id}
-              className="flex w-full flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-zinc-200/80 px-3 py-2 text-sm sm:min-w-0 sm:max-w-full sm:flex-[1_1_16rem] dark:border-zinc-600"
-              style={topicLabelStyle(t)}
-            >
-              <span className="min-w-0 flex-1 break-words font-medium">{t.title}</span>
-              <span className="shrink-0 opacity-80">({t.taskCount})</span>
-              <div className="flex w-full shrink-0 justify-end gap-2 sm:ml-auto sm:w-auto sm:justify-start">
-                <button
-                  type="button"
-                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
-                  onClick={() => openEditTopic(t)}
-                >
-                  עריכה
-                </button>
-                <button
-                  type="button"
-                  className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium text-red-800 hover:bg-red-100/90 hover:underline active:bg-red-200/90 dark:text-red-200 dark:hover:bg-red-950/50"
-                  onClick={() => deleteTopic(t.id)}
-                >
-                  מחיקה
-                </button>
-              </div>
-            </div>
-          ))}
-          {topics.length === 0 && (
-            <p className="text-sm text-zinc-500">עדיין אין נושאים — צרי נושא חדש.</p>
-          )}
-        </div>
-      </section>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full flex-col gap-2 sm:w-auto">
@@ -804,9 +748,14 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
       {topicModal && (
         <div
-          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          className="fixed inset-0 z-[60] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
           role="presentation"
-          onClick={(e) => e.target === e.currentTarget && setTopicModal(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setTopicModal(false);
+              setTopicModalForTask(false);
+            }
+          }}
         >
           <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
             <h3 className="text-base font-semibold sm:text-lg">נושא חדש</h3>
@@ -866,7 +815,10 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setTopicModal(false)}
+                  onClick={() => {
+                    setTopicModal(false);
+                    setTopicModalForTask(false);
+                  }}
                   className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
                   ביטול
@@ -909,21 +861,48 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 rows={3}
                 className="min-h-[5rem] w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
-              <label className="text-sm">
-                נושא
-                <select
-                  value={taskTopicId}
-                  onChange={(e) => setTaskTopicId(e.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
-                >
-                  <option value="">ללא נושא</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {editTaskId ? (
+                <label className="text-sm">
+                  נושא
+                  <select
+                    value={taskTopicId}
+                    onChange={(e) => setTaskTopicId(e.target.value)}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
+                  >
+                    <option value="">ללא נושא</option>
+                    {topics.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-2">
+                  <label className="min-w-0 flex-1 text-sm">
+                    <span className="block">נושא</span>
+                    <select
+                      value={taskTopicId}
+                      onChange={(e) => setTaskTopicId(e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
+                    >
+                      <option value="">ללא נושא</option>
+                      {topics.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={openTopicModalFromTask}
+                    className={`${btnSecondary} min-h-11 w-full shrink-0 sm:w-auto`}
+                  >
+                    נושא חדש
+                  </button>
+                </div>
+              )}
               <label className="text-sm">
                 מועד ביצוע
                 <input
@@ -1005,83 +984,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
-      {editingTopicId && (
-        <div
-          className="fixed inset-0 z-50 flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
-          role="presentation"
-          onClick={(e) => e.target === e.currentTarget && setEditingTopicId(null)}
-        >
-          <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold sm:text-lg">עריכת נושא</h3>
-            <form onSubmit={submitEditTopic} className="mt-4 flex flex-col gap-3">
-              <input
-                required
-                value={editTopicTitle}
-                onChange={(e) => setEditTopicTitle(e.target.value)}
-                className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
-              />
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
-                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  <input
-                    type="checkbox"
-                    checked={editTopicColorAuto}
-                    onChange={(e) => setEditTopicColorAuto(e.target.checked)}
-                    className="size-5 shrink-0"
-                  />
-                  צבע אוטומטי (האתר יבחר צבע ייחודי)
-                </label>
-                {!editTopicColorAuto && (
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      type="color"
-                      value={editTopicColorHex}
-                      onChange={(e) => setEditTopicColorHex(e.target.value)}
-                      className="h-11 w-16 min-w-[3.5rem] cursor-pointer rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600"
-                      aria-label="בחירת צבע לנושא"
-                    />
-                    <span className="font-mono text-sm text-zinc-600 dark:text-zinc-400">{editTopicColorHex}</span>
-                  </div>
-                )}
-              </div>
-              <div>
-                <p className="mb-1 text-sm text-zinc-600">שיוך למשתמשים</p>
-                <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
-                  {allUsers.map((u) => (
-                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
-                      <input
-                        type="checkbox"
-                        checked={editTopicUserIds.includes(u.id)}
-                        onChange={() =>
-                          setEditTopicUserIds((prev) =>
-                            prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
-                          )
-                        }
-                        className="size-5 shrink-0"
-                      />
-                      <span className="min-w-0 break-words">{u.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setEditingTopicId(null)}
-                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
-                >
-                  ביטול
-                </button>
-                <button
-                  type="submit"
-                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
-                >
-                  שמירה
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );
