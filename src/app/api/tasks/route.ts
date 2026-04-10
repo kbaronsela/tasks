@@ -10,7 +10,51 @@ function parseDate(s: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** למיון: התאריך המוקדם מבין מועד ביצוע לדד־ליין; אם אחד בלבד — הוא */
+/** סינון לפי YYYY-MM-DD: מטלה שמועד לביצוע או לביצוע עד נופלים בטווח (כולל) */
+function buildDateRangeWhere(
+  dateFrom: string | null,
+  dateTo: string | null,
+): { OR: ({ scheduledAt: object } | { dueAt: object })[] } | undefined {
+  const fp = dateFrom?.trim() || "";
+  const tp = dateTo?.trim() || "";
+  if (!fp && !tp) return undefined;
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+
+  let start: Date | undefined;
+  let end: Date | undefined;
+  if (fp && dateRe.test(fp)) {
+    start = new Date(`${fp}T00:00:00.000Z`);
+  }
+  if (tp && dateRe.test(tp)) {
+    end = new Date(`${tp}T23:59:59.999Z`);
+  }
+  if (start && end && start > end) {
+    start = new Date(`${tp}T00:00:00.000Z`);
+    end = new Date(`${fp}T23:59:59.999Z`);
+  }
+
+  if (start && end) {
+    return {
+      OR: [
+        { scheduledAt: { gte: start, lte: end } },
+        { dueAt: { gte: start, lte: end } },
+      ],
+    };
+  }
+  if (start) {
+    return {
+      OR: [{ scheduledAt: { gte: start } }, { dueAt: { gte: start } }],
+    };
+  }
+  if (end) {
+    return {
+      OR: [{ scheduledAt: { lte: end } }, { dueAt: { lte: end } }],
+    };
+  }
+  return undefined;
+}
+
+/** למיון: התאריך המוקדם מבין מועד לביצוע לדד־ליין; אם אחד בלבד — הוא */
 function effectiveSortMs(task: { scheduledAt: Date | null; dueAt: Date | null }): number | null {
   const s = task.scheduledAt?.getTime();
   const d = task.dueAt?.getTime();
@@ -44,6 +88,10 @@ export async function GET(req: NextRequest) {
   const showCompleted =
     req.nextUrl.searchParams.get("showCompleted") === "1" ||
     req.nextUrl.searchParams.get("showCompleted") === "true";
+  const dateRangeWhere = buildDateRangeWhere(
+    req.nextUrl.searchParams.get("dateFrom"),
+    req.nextUrl.searchParams.get("dateTo"),
+  );
 
   const doneWhere = showCompleted ? {} : { done: false };
   const include: TaskApiInclude = {
@@ -65,17 +113,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "אין גישה לנושא" }, { status: 403 });
     }
 
+    const topicBranch = {
+      ...doneWhere,
+      OR: [
+        { topicId: topicFilter },
+        {
+          topicId: null,
+          users: { some: { userId: session.userId } },
+        },
+      ],
+    };
+
     const raw = await prisma.task.findMany({
-      where: {
-        ...doneWhere,
-        OR: [
-          { topicId: topicFilter },
-          {
-            topicId: null,
-            users: { some: { userId: session.userId } },
-          },
-        ],
-      },
+      where: dateRangeWhere ? { AND: [topicBranch, dateRangeWhere] } : topicBranch,
       include,
     });
 
@@ -94,8 +144,10 @@ export async function GET(req: NextRequest) {
     topicWhere = { topicId: null };
   }
 
+  const listWhere = { ...baseWhere, ...topicWhere, ...doneWhere };
+
   const raw = await prisma.task.findMany({
-    where: { ...baseWhere, ...topicWhere, ...doneWhere },
+    where: dateRangeWhere ? { AND: [listWhere, dateRangeWhere] } : listWhere,
     include,
   });
 

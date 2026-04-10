@@ -57,6 +57,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [topicFilter, setTopicFilter] = useState<string>("all");
+  const [dateFilterFrom, setDateFilterFrom] = useState("");
+  const [dateFilterTo, setDateFilterTo] = useState("");
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [copyInviteHint, setCopyInviteHint] = useState<string | null>(null);
@@ -108,12 +111,18 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     if (showCompletedTasks) {
       params.set("showCompleted", "1");
     }
+    if (dateFilterFrom) {
+      params.set("dateFrom", dateFilterFrom);
+    }
+    if (dateFilterTo) {
+      params.set("dateTo", dateFilterTo);
+    }
     const q = params.toString() ? `?${params.toString()}` : "";
     const r = await fetch(`/api/tasks${q}`);
     if (!r.ok) throw new Error("טעינת מטלות נכשלה");
     const data = await r.json();
     setTasks(data.tasks);
-  }, [topicFilter, showCompletedTasks]);
+  }, [topicFilter, showCompletedTasks, dateFilterFrom, dateFilterTo]);
 
   const loadUsers = useCallback(async () => {
     const r = await fetch("/api/users");
@@ -142,10 +151,33 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   }, [loadTopics, loadTasks, loadUsers]);
 
   useEffect(() => {
-    if (inviteModalOpen) {
-      setInviteUrl(null);
-      setCopyInviteHint(null);
-    }
+    if (!inviteModalOpen) return;
+    setInviteUrl(null);
+    setInviteError(null);
+    setCopyInviteHint(null);
+    setInviteSending(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/invitations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const data = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!r.ok) {
+          setInviteError(data.error ?? "יצירת קישור הזמנה נכשלה");
+          return;
+        }
+        setInviteUrl(typeof data.inviteUrl === "string" ? data.inviteUrl : null);
+      } finally {
+        if (!cancelled) setInviteSending(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [inviteModalOpen]);
 
   const openNewTask = useCallback(() => {
@@ -428,30 +460,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     router.refresh();
   };
 
-  const submitInvites = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setInviteUrl(null);
-    setCopyInviteHint(null);
-    setInviteSending(true);
-    try {
-      const r = await fetch("/api/invitations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setError(data.error ?? "יצירת קישור הזמנה נכשלה");
-        return;
-      }
-      const url = typeof data.inviteUrl === "string" ? data.inviteUrl : null;
-      setInviteUrl(url);
-    } finally {
-      setInviteSending(false);
-    }
-  };
-
   const inviteTextToCopy = useMemo(() => {
     if (!inviteUrl) return "";
     return `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול המטלות.\n\nלהרשמה:\n${inviteUrl}\n\nהקישור תקף למספר ימים.`;
@@ -623,6 +631,43 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
             </p>
           )}
+          <div className="flex w-full flex-col gap-2">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              סינון לפי טווח תאריכים (מועד לביצוע או לביצוע עד)
+            </span>
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+              <label className="flex w-full flex-col gap-1 text-sm text-zinc-700 sm:w-auto dark:text-zinc-300">
+                <span className="shrink-0">מתאריך</span>
+                <input
+                  type="date"
+                  value={dateFilterFrom}
+                  onChange={(e) => setDateFilterFrom(e.target.value)}
+                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:w-[11rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+              <label className="flex w-full flex-col gap-1 text-sm text-zinc-700 sm:w-auto dark:text-zinc-300">
+                <span className="shrink-0">עד תאריך</span>
+                <input
+                  type="date"
+                  value={dateFilterTo}
+                  onChange={(e) => setDateFilterTo(e.target.value)}
+                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base sm:w-[11rem] sm:text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+              {(dateFilterFrom || dateFilterTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFilterFrom("");
+                    setDateFilterTo("");
+                  }}
+                  className="min-h-11 w-full shrink-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 sm:mt-5 sm:w-auto dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  נקה טווח
+                </button>
+              )}
+            </div>
+          </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
             <input
               type="checkbox"
@@ -691,10 +736,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                         {t.description}
                       </p>
                     )}
-                    <div className="mt-2 flex flex-col gap-1 text-xs text-zinc-500 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
-                      <span className="break-words">מועד ביצוע: {formatHeDate(t.scheduledAt)}</span>
-                      <span className="break-words">לביצוע עד: {formatHeDate(t.dueAt)}</span>
-                    </div>
+                    {(t.scheduledAt || t.dueAt) && (
+                      <div className="mt-2 flex flex-col gap-1 text-xs text-zinc-500 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
+                        {t.scheduledAt && (
+                          <span className="break-words">מועד לביצוע: {formatHeDate(t.scheduledAt)}</span>
+                        )}
+                        {t.dueAt && (
+                          <span className="break-words">לביצוע עד: {formatHeDate(t.dueAt)}</span>
+                        )}
+                      </div>
+                    )}
                     {t.prerequisites.length > 0 && (
                       <div className="mt-2 break-words text-sm leading-relaxed">
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">תלויות: </span>
@@ -754,52 +805,55 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         >
           <div className="my-auto w-full max-w-lg max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
             <h3 className="text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
-            <p className="mt-2 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">
-              {`נוצר קישור הזמנה אחד לכל מי שתשלחי אליו.
-אחרי יצירת הקישור ניתן להעתיק טקסט מוכן לשליחה (ווטסאפ / מייל) — ללא כתובת מייל בטקסט.`}
-            </p>
-            <form onSubmit={submitInvites} className="mt-4 flex flex-col gap-3">
-              <button
-                type="submit"
-                disabled={inviteSending}
-                className="min-h-11 w-full touch-manipulation rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 sm:w-auto"
-              >
-                {inviteSending ? "יוצר…" : "צור קישור הזמנה"}
-              </button>
-            </form>
-            {inviteUrl && (
-              <div className="mt-4 space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  טקסט להעתקה
-                </label>
-                <textarea
-                  readOnly
-                  value={inviteTextToCopy}
-                  rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
-                  className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
-                />
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-col gap-3">
+              {inviteSending && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">יוצר קישור הזמנה…</p>
+              )}
+              {inviteError && (
+                <p className="text-sm text-red-700 dark:text-red-300">{inviteError}</p>
+              )}
+              {!inviteSending && inviteUrl && (
+                <>
+                  <textarea
+                    readOnly
+                    value={inviteTextToCopy}
+                    rows={Math.min(12, 4 + inviteTextToCopy.split("\n").length)}
+                    className="w-full resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-sans text-sm leading-relaxed dark:border-zinc-600 dark:bg-zinc-800"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyInviteText}
+                        className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                      >
+                        העתק טקסט
+                      </button>
+                      {copyInviteHint && (
+                        <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInviteModalOpen(false)}
+                      className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                    >
+                      סגירה
+                    </button>
+                  </div>
+                </>
+              )}
+              {!inviteSending && inviteError && (
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={copyInviteText}
-                    className="min-h-11 touch-manipulation rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                    onClick={() => setInviteModalOpen(false)}
+                    className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
                   >
-                    העתק טקסט
+                    סגירה
                   </button>
-                  {copyInviteHint && (
-                    <span className="text-sm text-emerald-700 dark:text-emerald-400">{copyInviteHint}</span>
-                  )}
                 </div>
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setInviteModalOpen(false)}
-                className="min-h-11 rounded-lg px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                סגירה
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -1107,7 +1161,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </div>
               )}
               <label className="text-sm">
-                מועד ביצוע
+                מועד לביצוע
                 <input
                   type="datetime-local"
                   value={taskScheduled}

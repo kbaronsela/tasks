@@ -75,9 +75,6 @@ export function RegisterForm() {
     <div className="flex min-h-dvh min-h-[100svh] flex-col items-center justify-center px-4 py-8 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-center text-xl font-bold sm:text-2xl">הרשמה</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500">
-          {inviteToken ? "השלימי פרטים לפי ההזמנה" : "צרי משתמש חדש"}
-        </p>
         {inviteError && (
           <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
             {inviteError} — אפשר להירשם בלי קישור הזמנה (אם המערכת מאפשרת).
