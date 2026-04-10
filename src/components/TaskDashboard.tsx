@@ -758,9 +758,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         >
           <div className="my-auto w-full max-w-lg max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
             <h3 className="text-base font-semibold sm:text-lg">הזמנת משתמשים</h3>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              הזיני כתובת מייל אחת או כמה (פסיק, רווח או שורה חדשה). אחרי יצירת ההזמנה תוכלי להעתיק טקסט מוכן לשליחה
-              (ווטסאפ / מייל).
+            <p className="mt-2 whitespace-pre-line text-sm text-zinc-600 dark:text-zinc-400">
+              {`יש להזין כתובת מייל אחת או כמה (פסיק, רווח או שורה חדשה).
+אחרי יצירת ההזמנה ניתן להעתיק טקסט מוכן לשליחה (ווטסאפ / מייל).`}
             </p>
             <form onSubmit={submitInvites} className="mt-4 flex flex-col gap-3">
               <textarea
