@@ -66,7 +66,16 @@ export async function GET(req: NextRequest) {
     }
 
     const raw = await prisma.task.findMany({
-      where: { topicId: topicFilter, ...doneWhere },
+      where: {
+        ...doneWhere,
+        OR: [
+          { topicId: topicFilter },
+          {
+            topicId: null,
+            users: { some: { userId: session.userId } },
+          },
+        ],
+      },
       include,
     });
 

@@ -141,7 +141,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     };
   }, [loadTopics, loadTasks, loadUsers]);
 
-  const openNewTask = () => {
+  const openNewTask = useCallback(() => {
     setEditTaskId(null);
     setTaskTitle("");
     setTaskDescription("");
@@ -151,7 +151,56 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTaskUserIds([user.id]);
     setTaskPrereqIds([]);
     setTaskModal(true);
-  };
+  }, [user.id]);
+
+  const openNewTopicModal = useCallback(() => {
+    setTopicUserIds([user.id]);
+    setTopicTitle("");
+    setTopicColorAuto(true);
+    setTopicColorHex("#6366f1");
+    setTopicModal(true);
+  }, [user.id]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const isTypingContext = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      return Boolean(el.closest?.("[contenteditable='true']"));
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.altKey || e.shiftKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "t" && k !== "n") return;
+      if (isTypingContext(e.target)) return;
+      if (topicModal || taskModal || inviteModalOpen || editingTopicId !== null) return;
+
+      if (k === "t") {
+        e.preventDefault();
+        openNewTopicModal();
+      } else {
+        e.preventDefault();
+        openNewTask();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [
+    loading,
+    topicModal,
+    taskModal,
+    inviteModalOpen,
+    editingTopicId,
+    openNewTopicModal,
+    openNewTask,
+  ]);
 
   const openEditTask = (t: TaskItem) => {
     setEditTaskId(t.id);
@@ -378,76 +427,102 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700";
   const btnSecondary =
     "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800";
-  const btnGhost =
-    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800";
+
+  const sidebarNavBtn =
+    "w-full rounded-xl px-3 py-2.5 text-right text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200/80 active:bg-zinc-300/80 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700";
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
-      <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
-          <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-start sm:gap-2">
-          <div className="relative col-span-1 flex justify-start sm:col-span-1">
-            <button
-              type="button"
-              onClick={() => setMoreMenuOpen((o) => !o)}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 text-sm text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              aria-expanded={moreMenuOpen}
-              aria-haspopup="menu"
-              title="עוד אפשרויות"
-            >
-              ⋯
-            </button>
-            {moreMenuOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default bg-transparent"
-                  aria-label="סגירת תפריט"
-                  onClick={() => setMoreMenuOpen(false)}
-                />
-                <div
-                  className="absolute start-0 top-full z-40 mt-1 min-w-[11rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-                  role="menu"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      setInviteModalOpen(true);
-                    }}
-                  >
-                    הזמנת משתמשים
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+    <div className="flex min-h-dvh w-full flex-col lg:flex-row">
+      <aside
+        className="hidden shrink-0 border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:flex-col lg:overflow-y-auto lg:border-e"
+        aria-label="תפריט צד"
+      >
+        <nav className="flex flex-col gap-1 p-4 pt-6">
           <button
             type="button"
-            onClick={() => {
-              setTopicUserIds([user.id]);
-              setTopicTitle("");
-              setTopicColorAuto(true);
-              setTopicColorHex("#6366f1");
-              setTopicModal(true);
-            }}
-            className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
+            className={sidebarNavBtn}
+            onClick={() => setInviteModalOpen(true)}
           >
-            נושא חדש
+            הזמנת משתמשים
           </button>
-          <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
-            מטלה חדשה
-          </button>
-          <button type="button" onClick={logout} className={`${btnGhost} col-span-1 w-full sm:w-auto`}>
+          <button type="button" className={sidebarNavBtn} onClick={() => void logout()}>
             יציאה
           </button>
-        </div>
-      </header>
+        </nav>
+      </aside>
+
+      <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
+        <header className="relative flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
+          <div className="min-w-0 pe-12 lg:pe-0">
+            <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
+            <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
+          </div>
+
+          <div className="absolute end-0 top-0 z-20 lg:hidden">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreMenuOpen((o) => !o)}
+                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-2 text-lg leading-none text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                aria-expanded={moreMenuOpen}
+                aria-haspopup="menu"
+                title="תפריט"
+              >
+                ⋯
+              </button>
+              {moreMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-30 cursor-default bg-transparent"
+                    aria-label="סגירת תפריט"
+                    onClick={() => setMoreMenuOpen(false)}
+                  />
+                  <div
+                    className="absolute start-0 top-full z-40 mt-1 min-w-[12rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        setInviteModalOpen(true);
+                      }}
+                    >
+                      הזמנת משתמשים
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        void logout();
+                      }}
+                    >
+                      יציאה
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-shrink-0 sm:flex-wrap sm:justify-start sm:gap-2 lg:w-auto">
+            <button
+              type="button"
+              onClick={openNewTopicModal}
+              className={`${btnSecondary} col-span-1 w-full sm:w-auto`}
+            >
+              נושא חדש
+            </button>
+            <button type="button" onClick={openNewTask} className={`${btnPrimary} col-span-1 w-full sm:w-auto`}>
+              מטלה חדשה
+            </button>
+          </div>
+        </header>
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
@@ -1007,6 +1082,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
