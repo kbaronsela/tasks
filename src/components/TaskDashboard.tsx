@@ -80,6 +80,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
   const [topicModalForTask, setTopicModalForTask] = useState(false);
 
+  const [topicsListModalOpen, setTopicsListModalOpen] = useState(false);
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editTopicTitle, setEditTopicTitle] = useState("");
+  const [editTopicUserIds, setEditTopicUserIds] = useState<string[]>([]);
+  const [editTopicColorAuto, setEditTopicColorAuto] = useState(true);
+  const [editTopicColorHex, setEditTopicColorHex] = useState("#6366f1");
+
   const [inviteEmailsRaw, setInviteEmailsRaw] = useState("");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteResults, setInviteResults] = useState<
@@ -185,7 +192,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       const k = e.key.toLowerCase();
       if (k !== "t" && k !== "n") return;
       if (isTypingContext(e.target)) return;
-      if (topicModal || taskModal || inviteModalOpen) return;
+      if (topicModal || taskModal || inviteModalOpen || topicsListModalOpen || editingTopicId) return;
 
       if (k === "t") {
         e.preventDefault();
@@ -198,7 +205,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [loading, topicModal, taskModal, inviteModalOpen, openNewTopicModal, openNewTask]);
+  }, [
+    loading,
+    topicModal,
+    taskModal,
+    inviteModalOpen,
+    topicsListModalOpen,
+    editingTopicId,
+    openNewTopicModal,
+    openNewTask,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -214,6 +230,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         setTopicModalForTask(false);
         return;
       }
+      if (editingTopicId) {
+        e.preventDefault();
+        setEditingTopicId(null);
+        return;
+      }
+      if (topicsListModalOpen) {
+        e.preventDefault();
+        setTopicsListModalOpen(false);
+        return;
+      }
       if (taskModal) {
         e.preventDefault();
         setTaskModal(false);
@@ -221,7 +247,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inviteModalOpen, topicModal, taskModal]);
+  }, [inviteModalOpen, topicModal, editingTopicId, topicsListModalOpen, taskModal]);
 
   const openEditTask = (t: TaskItem) => {
     setEditTaskId(t.id);
@@ -267,6 +293,56 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     } else {
       setToast("הנושא נוצר בהצלחה");
     }
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const openEditTopic = (t: Topic) => {
+    setEditingTopicId(t.id);
+    setEditTopicTitle(t.title);
+    setEditTopicUserIds(t.users.map((u) => u.id));
+    const auto = !t.color;
+    setEditTopicColorAuto(auto);
+    setEditTopicColorHex(t.color ?? resolveTopicColor(t));
+  };
+
+  const submitEditTopic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTopicId) return;
+    setError(null);
+    const r = await fetch(`/api/topics/${editingTopicId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editTopicTitle,
+        userIds: editTopicUserIds,
+        color: editTopicColorAuto ? null : editTopicColorHex,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error ?? "שמירה נכשלה");
+      return;
+    }
+    setEditingTopicId(null);
+    await loadTopics();
+    await loadTasks();
+    setToast("הנושא עודכן");
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const deleteTopic = async (id: string) => {
+    if (!confirm("למחוק את הנושא? המטלות יישארו ללא נושא.")) return;
+    setError(null);
+    const r = await fetch(`/api/topics/${id}`, { method: "DELETE" });
+    if (!r.ok) {
+      setError("מחיקה נכשלה");
+      return;
+    }
+    if (topicFilter === id) setTopicFilter("all");
+    if (taskTopicId === id) setTaskTopicId("");
+    await loadTopics();
+    await loadTasks();
+    setToast("הנושא נמחק");
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -431,6 +507,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           >
             הזמנת משתמשים
           </button>
+          <button type="button" className={sidebarNavBtn} onClick={() => setTopicsListModalOpen(true)}>
+            נושאים
+          </button>
           <button type="button" className={sidebarNavBtn} onClick={() => void logout()}>
             יציאה
           </button>
@@ -478,6 +557,17 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       }}
                     >
                       הזמנת משתמשים
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        setTopicsListModalOpen(true);
+                      }}
+                    >
+                      נושאים
                     </button>
                     <button
                       type="button"
@@ -746,6 +836,63 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
+      {topicsListModalOpen && (
+        <div
+          className="fixed inset-0 z-[55] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setTopicsListModalOpen(false)}
+        >
+          <div className="my-auto w-full max-w-lg max-h-[min(88dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">נושאים</h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              כל הנושאים שמשויכים אליך. לעריכה או מחיקה השתמשי בכפתורים ליד כל נושא.
+            </p>
+            <ul className="mt-4 flex flex-col gap-2">
+              {topics.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-zinc-200/80 px-3 py-2.5 text-sm sm:flex-nowrap dark:border-zinc-600"
+                  style={topicLabelStyle(t)}
+                >
+                  <span className="min-w-0 flex-1 break-words font-medium">{t.title}</span>
+                  <span className="shrink-0 opacity-90">({t.taskCount})</span>
+                  <div className="flex w-full shrink-0 justify-end gap-2 sm:mr-auto sm:w-auto sm:justify-start">
+                    <button
+                      type="button"
+                      className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
+                      onClick={() => openEditTopic(t)}
+                    >
+                      עריכה
+                    </button>
+                    <button
+                      type="button"
+                      className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium text-red-900 hover:bg-red-100/90 hover:underline active:bg-red-200/90 dark:text-red-100 dark:hover:bg-red-950/50"
+                      onClick={() => void deleteTopic(t.id)}
+                    >
+                      מחיקה
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {topics.length === 0 && (
+              <p className="mt-4 text-sm text-zinc-500">
+                אין נושאים עדיין — אפשר ליצור נושא ממסך יצירת מטלה חדשה או בקיצור Ctrl+T.
+              </p>
+            )}
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setTopicsListModalOpen(false)}
+                className="min-h-11 rounded-lg bg-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+              >
+                סגירה
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {topicModal && (
         <div
           className="fixed inset-0 z-[60] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
@@ -819,6 +966,89 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     setTopicModal(false);
                     setTopicModalForTask(false);
                   }}
+                  className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
+                >
+                  ביטול
+                </button>
+                <button
+                  type="submit"
+                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
+                >
+                  שמירה
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingTopicId && (
+        <div
+          className="fixed inset-0 z-[65] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setEditingTopicId(null)}
+        >
+          <div className="my-auto w-full max-w-md max-h-[min(90dvh,720px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <h3 className="text-base font-semibold sm:text-lg">עריכת נושא</h3>
+            <form onSubmit={submitEditTopic} className="mt-4 flex flex-col gap-3">
+              <label className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                שם
+                <input
+                  required
+                  value={editTopicTitle}
+                  onChange={(e) => setEditTopicTitle(e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
+                />
+              </label>
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  <input
+                    type="checkbox"
+                    checked={editTopicColorAuto}
+                    onChange={(e) => setEditTopicColorAuto(e.target.checked)}
+                    className="size-5 shrink-0"
+                  />
+                  צבע אוטומטי (האתר יבחר צבע ייחודי)
+                </label>
+                {!editTopicColorAuto && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      type="color"
+                      value={editTopicColorHex}
+                      onChange={(e) => setEditTopicColorHex(e.target.value)}
+                      className="h-11 w-16 min-w-[3.5rem] cursor-pointer rounded-lg border border-zinc-300 bg-white p-1 dark:border-zinc-600"
+                      aria-label="בחירת צבע לנושא"
+                    />
+                    <span className="font-mono text-sm text-zinc-600 dark:text-zinc-400">{editTopicColorHex}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">שיוך למשתמשים</p>
+                <div className="max-h-40 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                  {allUsers.map((u) => (
+                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
+                      <input
+                        type="checkbox"
+                        checked={editTopicUserIds.includes(u.id)}
+                        onChange={() =>
+                          setEditTopicUserIds((prev) =>
+                            prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
+                          )
+                        }
+                        className="size-5 shrink-0"
+                      />
+                      <span className="min-w-0 break-words">
+                        {u.name} ({u.email})
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingTopicId(null)}
                   className="min-h-11 w-full touch-manipulation rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 sm:w-auto dark:hover:bg-zinc-800"
                 >
                   ביטול
