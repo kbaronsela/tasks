@@ -56,7 +56,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (body.userIds !== undefined) {
     const userIds = [...new Set((body.userIds as string[]).filter(Boolean))];
-    if (!userIds.includes(session.userId)) userIds.push(session.userId);
+    if (userIds.length === 0) {
+      return NextResponse.json({ error: "נדרש לפחות משתמש משויך אחד" }, { status: 400 });
+    }
     await prisma.$transaction([
       prisma.taskUser.deleteMany({ where: { taskId: id } }),
       prisma.taskUser.createMany({

@@ -43,6 +43,15 @@ function toDatetimeLocalValue(iso: string | null): string {
   return local.toISOString().slice(0, 16);
 }
 
+/** ערך מ־datetime-local (שעון מקומי של המשתמש) → מחרוזת ISO ב-UTC לשמירה בשרת בלי הזזת שעה לפי TZ של המכונה */
+function datetimeLocalToUtcIso(localValue: string): string | null {
+  const t = localValue?.trim() ?? "";
+  if (!t) return null;
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 function formatHeDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("he-IL", {
@@ -110,6 +119,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [taskDue, setTaskDue] = useState("");
   const [taskUserIds, setTaskUserIds] = useState<string[]>([]);
   const [taskPrereqIds, setTaskPrereqIds] = useState<string[]>([]);
+  const [taskPrereqModalOpen, setTaskPrereqModalOpen] = useState(false);
 
   const [topicModalForTask, setTopicModalForTask] = useState(false);
 
@@ -264,7 +274,15 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       const k = e.key.toLowerCase();
       if (k !== "t" && k !== "n") return;
       if (isTypingContext(e.target)) return;
-      if (topicModal || taskModal || inviteModalOpen || topicsListModalOpen || editingTopicId || filterModalOpen)
+      if (
+        topicModal ||
+        taskModal ||
+        taskPrereqModalOpen ||
+        inviteModalOpen ||
+        topicsListModalOpen ||
+        editingTopicId ||
+        filterModalOpen
+      )
         return;
 
       if (k === "t") {
@@ -282,6 +300,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     loading,
     topicModal,
     taskModal,
+    taskPrereqModalOpen,
     inviteModalOpen,
     topicsListModalOpen,
     editingTopicId,
@@ -319,6 +338,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         setFilterModalOpen(false);
         return;
       }
+      if (taskPrereqModalOpen) {
+        e.preventDefault();
+        setTaskPrereqModalOpen(false);
+        return;
+      }
       if (taskModal) {
         e.preventDefault();
         setTaskModal(false);
@@ -326,7 +350,19 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inviteModalOpen, topicModal, editingTopicId, topicsListModalOpen, filterModalOpen, taskModal]);
+  }, [
+    inviteModalOpen,
+    topicModal,
+    editingTopicId,
+    topicsListModalOpen,
+    filterModalOpen,
+    taskPrereqModalOpen,
+    taskModal,
+  ]);
+
+  useEffect(() => {
+    if (!taskModal) setTaskPrereqModalOpen(false);
+  }, [taskModal]);
 
   const openEditTask = (t: TaskItem) => {
     setEditTaskId(t.id);
@@ -349,7 +385,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: topicTitle,
-        userIds: topicUserIds.length ? topicUserIds : [user.id],
+        userIds: topicUserIds,
         color: topicColorAuto ? null : topicColorHex,
       }),
     });
@@ -432,9 +468,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       title: taskTitle,
       description: taskDescription || null,
       topicId: taskTopicId || null,
-      scheduledAt: taskScheduled || null,
-      dueAt: taskDue || null,
-      userIds: taskUserIds.length ? taskUserIds : [user.id],
+      scheduledAt: datetimeLocalToUtcIso(taskScheduled),
+      dueAt: datetimeLocalToUtcIso(taskDue),
+      userIds: taskUserIds,
       dependsOnTaskIds: taskPrereqIds,
     };
     const r = editTaskId
@@ -1083,11 +1119,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       <input
                         type="checkbox"
                         checked={topicUserIds.includes(u.id)}
-                        onChange={() =>
+                        onChange={(e) => {
+                          const on = e.target.checked;
                           setTopicUserIds((prev) =>
-                            prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
-                          )
-                        }
+                            on ? (prev.includes(u.id) ? prev : [...prev, u.id]) : prev.filter((x) => x !== u.id)
+                          );
+                        }}
                         className="size-5 shrink-0"
                       />
                       <span className="min-w-0 break-words">
@@ -1162,11 +1199,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       <input
                         type="checkbox"
                         checked={editTopicUserIds.includes(u.id)}
-                        onChange={() =>
+                        onChange={(e) => {
+                          const on = e.target.checked;
                           setEditTopicUserIds((prev) =>
-                            prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
-                          )
-                        }
+                            on ? (prev.includes(u.id) ? prev : [...prev, u.id]) : prev.filter((x) => x !== u.id)
+                          );
+                        }}
                         className="size-5 shrink-0"
                       />
                       <span className="min-w-0 break-words">
@@ -1286,11 +1324,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       <input
                         type="checkbox"
                         checked={taskUserIds.includes(u.id)}
-                        onChange={() =>
+                        onChange={(e) => {
+                          const on = e.target.checked;
                           setTaskUserIds((prev) =>
-                            prev.includes(u.id) ? prev.filter((x) => x !== u.id) : [...prev, u.id]
-                          )
-                        }
+                            on ? (prev.includes(u.id) ? prev : [...prev, u.id]) : prev.filter((x) => x !== u.id)
+                          );
+                        }}
                         className="size-5 shrink-0"
                       />
                       <span className="min-w-0 break-words">{u.name}</span>
@@ -1299,27 +1338,40 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </div>
               </div>
               <div>
-                <p className="mb-1 text-sm text-zinc-600">תלויות (יש להשלים לפני המטלה הנוכחית)</p>
-                <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
-                  {prereqOptions.map((p) => (
-                    <label key={p.id} className="flex min-h-11 cursor-pointer items-start gap-2 text-sm touch-manipulation">
-                      <input
-                        type="checkbox"
-                        checked={taskPrereqIds.includes(p.id)}
-                        onChange={() =>
-                          setTaskPrereqIds((prev) =>
-                            prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
-                          )
-                        }
-                        className="mt-0.5 size-5 shrink-0"
-                      />
-                      <span className="min-w-0 break-words">{p.title}</span>
-                    </label>
-                  ))}
-                  {prereqOptions.length === 0 && (
-                    <p className="text-xs text-zinc-400">אין מטלות אחרות לבחירה</p>
-                  )}
-                </div>
+                <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">
+                  תלויות (יש להשלים לפני המטלה הנוכחית)
+                </p>
+                {taskPrereqIds.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {taskPrereqIds.map((id) => {
+                      const p = tasks.find((t) => t.id === id);
+                      if (!p) return null;
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex max-w-full items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-800 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
+                        >
+                          <span className="min-w-0 truncate">{p.title}</span>
+                          <button
+                            type="button"
+                            className="shrink-0 rounded p-0.5 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                            aria-label={`הסר תלות: ${p.title}`}
+                            onClick={() => setTaskPrereqIds((prev) => prev.filter((x) => x !== id))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setTaskPrereqModalOpen(true)}
+                  className={`${btnSecondary} w-full sm:w-auto`}
+                >
+                  {taskPrereqIds.length ? "עריכת תלויות…" : "בחר תלויות…"}
+                </button>
               </div>
               <div className="mt-2 flex justify-stretch pt-2 sm:justify-end">
                 <button
@@ -1330,6 +1382,54 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {taskModal && taskPrereqModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setTaskPrereqModalOpen(false)}
+        >
+          <div className="my-auto w-full max-w-md max-h-[min(85dvh,560px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
+            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+              <ModalCloseButton onClick={() => setTaskPrereqModalOpen(false)} />
+              <h3 className="text-center text-base font-semibold sm:text-lg">תלויות</h3>
+            </div>
+            <p className="mb-3 text-center text-sm text-zinc-600 dark:text-zinc-400">
+              בחרו מטלות שיש להשלים לפני המטלה הנוכחית (ניתן לבחור כמה).
+            </p>
+            <div className="max-h-[min(45dvh,320px)] space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+              {prereqOptions.map((p) => (
+                <label key={p.id} className="flex min-h-11 cursor-pointer items-start gap-2 text-sm touch-manipulation">
+                  <input
+                    type="checkbox"
+                    checked={taskPrereqIds.includes(p.id)}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setTaskPrereqIds((prev) =>
+                        on ? (prev.includes(p.id) ? prev : [...prev, p.id]) : prev.filter((x) => x !== p.id)
+                      );
+                    }}
+                    className="mt-0.5 size-5 shrink-0"
+                  />
+                  <span className="min-w-0 break-words">{p.title}</span>
+                </label>
+              ))}
+              {prereqOptions.length === 0 && (
+                <p className="px-1 py-2 text-center text-sm text-zinc-400">אין מטלות אחרות לבחירה</p>
+              )}
+            </div>
+            <div className="mt-4 flex justify-stretch sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setTaskPrereqModalOpen(false)}
+                className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
+              >
+                סיום
+              </button>
+            </div>
           </div>
         </div>
       )}
