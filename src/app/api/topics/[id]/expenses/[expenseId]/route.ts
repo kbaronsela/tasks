@@ -10,6 +10,11 @@ function mapExpense(e: {
   description: string | null;
   spentAt: Date;
   createdAt: Date;
+  assignedUser: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }) {
   return {
     id: e.id,
@@ -18,6 +23,7 @@ function mapExpense(e: {
     description: e.description,
     spentAt: e.spentAt.toISOString(),
     createdAt: e.createdAt.toISOString(),
+    assignedUser: e.assignedUser,
   };
 }
 
@@ -40,7 +46,13 @@ export async function PATCH(
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
-  let body: { amount?: unknown; currency?: unknown; description?: unknown; spentAt?: unknown };
+  let body: {
+    amount?: unknown;
+    currency?: unknown;
+    description?: unknown;
+    spentAt?: unknown;
+    assignedUserId?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -52,6 +64,7 @@ export async function PATCH(
     currency?: string;
     description?: string | null;
     spentAt?: Date;
+    assignedUserId?: string | null;
   } = {};
 
   if (body.amount !== undefined) {
@@ -77,10 +90,24 @@ export async function PATCH(
     const d = new Date(String(body.spentAt));
     if (!Number.isNaN(d.getTime())) data.spentAt = d;
   }
+  if (body.assignedUserId !== undefined) {
+    if (body.assignedUserId === null || !String(body.assignedUserId).trim()) {
+      data.assignedUserId = null;
+    } else {
+      const aid = String(body.assignedUserId).trim();
+      if (!(await isTopicMember(topicId, aid))) {
+        return NextResponse.json({ error: "משתמש משויך חייב להיות חבר בנושא" }, { status: 400 });
+      }
+      data.assignedUserId = aid;
+    }
+  }
 
   const row = await prisma.topicExpense.update({
     where: { id: expenseId },
     data,
+    include: {
+      assignedUser: { select: { id: true, name: true, email: true } },
+    },
   });
 
   return NextResponse.json({ expense: mapExpense(row) });

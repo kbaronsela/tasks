@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+type HubUser = { id: string; name: string; email: string };
+
 type ExpenseRow = {
   id: string;
   amount: string;
   currency: string;
   description: string | null;
   spentAt: string;
+  assignedUser: HubUser | null;
 };
 
 type ProfessionalRow = {
@@ -62,11 +65,14 @@ const btnSecondary =
 export function TopicHubSections({
   topicId,
   tab,
+  topicUsers,
   onToast,
   onError,
 }: {
   topicId: string;
   tab: "expenses" | "contacts" | "dates" | "shopping" | "packing";
+  /** משתמשים המשויכים לנושא — לשיוך הוצאות */
+  topicUsers: HubUser[];
   onToast: (msg: string) => void;
   onError: (msg: string | null) => void;
 }) {
@@ -76,6 +82,7 @@ export function TopicHubSections({
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDesc, setExpenseDesc] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expenseAssignedUserId, setExpenseAssignedUserId] = useState("");
 
   const [professionals, setProfessionals] = useState<ProfessionalRow[]>([]);
   const [pName, setPName] = useState("");
@@ -169,6 +176,7 @@ export function TopicHubSections({
         amount: expenseAmount,
         description: expenseDesc || null,
         spentAt: expenseDate ? `${expenseDate}T12:00:00.000Z` : undefined,
+        assignedUserId: expenseAssignedUserId.trim() || null,
       }),
     });
     const j = await r.json().catch(() => ({}));
@@ -178,8 +186,26 @@ export function TopicHubSections({
     }
     setExpenseAmount("");
     setExpenseDesc("");
+    setExpenseAssignedUserId("");
     await loadExpenses();
     onToast("ההוצאה נוספה");
+  };
+
+  const patchExpenseAssignedUser = async (expenseId: string, userId: string) => {
+    onError(null);
+    const r = await fetch(`${base}/expenses/${expenseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        assignedUserId: userId.trim() ? userId : null,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      onError(j.error ?? "עדכון שיוך נכשל");
+      return;
+    }
+    await loadExpenses();
   };
 
   const delExpense = async (id: string) => {
@@ -411,6 +437,21 @@ export function TopicHubSections({
               className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
             />
           </label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            משויך למשתמש (אופציונלי)
+            <select
+              value={expenseAssignedUserId}
+              onChange={(e) => setExpenseAssignedUserId(e.target.value)}
+              className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-600 dark:bg-zinc-900"
+            >
+              <option value="">ללא שיוך</option>
+              {topicUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="submit"
             className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
@@ -422,7 +463,7 @@ export function TopicHubSections({
           {expenses.map((x) => (
             <li
               key={x.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
             >
               <div className="min-w-0 flex-1">
                 <span className="font-medium">{parseFloat(x.amount).toLocaleString("he-IL")} ₪</span>
@@ -433,13 +474,34 @@ export function TopicHubSections({
                   {formatHe(x.spentAt)}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => void delExpense(x.id)}
-                className="shrink-0 text-sm text-red-600 hover:underline"
-              >
-                מחיקה
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex min-w-[10rem] flex-col gap-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                  משויך
+                  <select
+                    value={x.assignedUser?.id ?? ""}
+                    onChange={(e) => void patchExpenseAssignedUser(x.id, e.target.value)}
+                    className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="">ללא שיוך</option>
+                    {x.assignedUser &&
+                      !topicUsers.some((u) => u.id === x.assignedUser!.id) && (
+                        <option value={x.assignedUser.id}>{x.assignedUser.name} (הוסר מהנושא)</option>
+                      )}
+                    {topicUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void delExpense(x.id)}
+                  className="shrink-0 self-end text-sm text-red-600 hover:underline sm:self-center"
+                >
+                  מחיקה
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -104,6 +104,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [hubTab, setHubTab] = useState<HubTab>("tasks");
   const [dateFilterFrom, setDateFilterFrom] = useState("");
   const [dateFilterTo, setDateFilterTo] = useState("");
+  /** רק מטלות שהמשתמש המחובר משויך אליהן (משמעותי כשנבחר נושא — מסתיר מטלות של אחרים בנושא) */
+  const [onlyMyTasks, setOnlyMyTasks] = useState(false);
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +147,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
+  const [draftOnlyMyTasks, setDraftOnlyMyTasks] = useState(false);
 
   const loadTopics = useCallback(async () => {
     const r = await fetch("/api/topics");
@@ -168,17 +171,21 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     if (dateFilterTo) {
       params.set("dateTo", dateFilterTo);
     }
+    if (onlyMyTasks) {
+      params.set("onlyMine", "1");
+    }
     const q = params.toString() ? `?${params.toString()}` : "";
     const r = await fetch(`/api/tasks${q}`);
     if (!r.ok) throw new Error("טעינת מטלות נכשלה");
     const data = await r.json();
     setTasks(data.tasks);
-  }, [focusTopicId, showCompletedTasks, dateFilterFrom, dateFilterTo]);
+  }, [focusTopicId, showCompletedTasks, dateFilterFrom, dateFilterTo, onlyMyTasks]);
 
   useEffect(() => {
     if (topics.length === 0) {
       setFocusTopicId(null);
       setHubTab("tasks");
+      setOnlyMyTasks(false);
       return;
     }
     setFocusTopicId((prev) => {
@@ -580,12 +587,14 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const openFilterModal = useCallback(() => {
     setDraftDateFrom(dateFilterFrom);
     setDraftDateTo(dateFilterTo);
+    setDraftOnlyMyTasks(onlyMyTasks);
     setFilterModalOpen(true);
-  }, [dateFilterFrom, dateFilterTo]);
+  }, [dateFilterFrom, dateFilterTo, onlyMyTasks]);
 
   const applyTaskFilters = () => {
     setDateFilterFrom(draftDateFrom);
     setDateFilterTo(draftDateTo);
+    setOnlyMyTasks(draftOnlyMyTasks);
     setFilterModalOpen(false);
   };
 
@@ -596,8 +605,10 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const removeAllTaskFilters = () => {
     setDateFilterFrom("");
     setDateFilterTo("");
+    setOnlyMyTasks(false);
     setDraftDateFrom("");
     setDraftDateTo("");
+    setDraftOnlyMyTasks(false);
     setFilterModalOpen(false);
   };
 
@@ -817,6 +828,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         <TopicHubSections
           topicId={focusTopicId}
           tab={hubTab}
+          topicUsers={topics.find((t) => t.id === focusTopicId)?.users ?? []}
           onToast={(msg) => {
             setToast(msg);
             setTimeout(() => setToast(null), 3000);
@@ -841,6 +853,22 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   המטלות מסוננות לפי הנושא הנבחר בסרגל הצד. בנושא נבחר מוצגות גם מטלות ללא נושא המשויכות אליך.
                 </p>
+              )}
+              {focusTopicId && (
+                <label className="flex cursor-pointer items-start gap-3 text-sm text-zinc-800 dark:text-zinc-200">
+                  <input
+                    type="checkbox"
+                    checked={draftOnlyMyTasks}
+                    onChange={(e) => setDraftOnlyMyTasks(e.target.checked)}
+                    className="mt-0.5 size-5 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>
+                    הצג רק מטלות שלי (משויכות אליי)
+                    <span className="mt-1 block text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                      מסתיר מטלות של אחרים בנושא הנבחר (ללא שינוי במטלות ללא נושא המשויכות אליך).
+                    </span>
+                  </span>
+                </label>
               )}
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">

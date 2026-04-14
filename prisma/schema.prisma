@@ -19,6 +19,7 @@ model User {
   tasksCreated  Task[]      @relation("TaskCreator")
   invitationsSent Invitation[] @relation("InvitedBy")
   expensesCreated TopicExpense[] @relation("ExpenseCreator")
+  expensesAssigned TopicExpense[] @relation("ExpenseAssignedTo")
 }
 
 model Invitation {
@@ -63,6 +64,9 @@ model TopicExpense {
   createdAt   DateTime @default(now())
   createdById String?
   createdBy   User?    @relation("ExpenseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  /// משתמש מהנושא שאליו מקושרת ההוצאה (למשל מי הוציא / אחראי)
+  assignedUserId String?
+  assignedUser   User?    @relation("ExpenseAssignedTo", fields: [assignedUserId], references: [id], onDelete: SetNull)
 
   @@index([topicId, spentAt])
 }

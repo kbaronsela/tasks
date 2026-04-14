@@ -10,6 +10,11 @@ function mapExpense(e: {
   description: string | null;
   spentAt: Date;
   createdAt: Date;
+  assignedUser: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }) {
   return {
     id: e.id,
@@ -18,6 +23,7 @@ function mapExpense(e: {
     description: e.description,
     spentAt: e.spentAt.toISOString(),
     createdAt: e.createdAt.toISOString(),
+    assignedUser: e.assignedUser,
   };
 }
 
@@ -36,6 +42,9 @@ export async function GET(
   const rows = await prisma.topicExpense.findMany({
     where: { topicId },
     orderBy: [{ spentAt: "desc" }, { createdAt: "desc" }],
+    include: {
+      assignedUser: { select: { id: true, name: true, email: true } },
+    },
   });
 
   return NextResponse.json({ expenses: rows.map(mapExpense) });
@@ -53,11 +62,26 @@ export async function POST(
     return NextResponse.json({ error: "אין גישה לנושא" }, { status: 403 });
   }
 
-  let body: { amount?: unknown; currency?: unknown; description?: unknown; spentAt?: unknown };
+  let body: {
+    amount?: unknown;
+    currency?: unknown;
+    description?: unknown;
+    spentAt?: unknown;
+    assignedUserId?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "גוף בקשה לא תקין" }, { status: 400 });
+  }
+
+  let assignedUserId: string | null = null;
+  if (body.assignedUserId != null && String(body.assignedUserId).trim()) {
+    const aid = String(body.assignedUserId).trim();
+    if (!(await isTopicMember(topicId, aid))) {
+      return NextResponse.json({ error: "משתמש משויך חייב להיות חבר בנושא" }, { status: 400 });
+    }
+    assignedUserId = aid;
   }
 
   const raw = body.amount;
@@ -88,6 +112,10 @@ export async function POST(
       description,
       spentAt,
       createdById: session.userId,
+      assignedUserId,
+    },
+    include: {
+      assignedUser: { select: { id: true, name: true, email: true } },
     },
   });
 

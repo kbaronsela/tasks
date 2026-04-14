@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
@@ -93,6 +94,10 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("dateTo"),
   );
 
+  const onlyMine =
+    req.nextUrl.searchParams.get("onlyMine") === "1" ||
+    req.nextUrl.searchParams.get("onlyMine") === "true";
+
   const doneWhere = showCompleted ? {} : { done: false };
   const include: TaskApiInclude = {
     topic: { select: { id: true, title: true, color: true } },
@@ -124,8 +129,19 @@ export async function GET(req: NextRequest) {
       ],
     };
 
+    const mineWhere: Prisma.TaskWhereInput | null = onlyMine
+      ? { users: { some: { userId: session.userId } } }
+      : null;
+
+    const topicWhereParts: Prisma.TaskWhereInput[] = [topicBranch];
+    if (mineWhere) topicWhereParts.push(mineWhere);
+    if (dateRangeWhere) topicWhereParts.push(dateRangeWhere);
+
+    const topicWhereFinal: Prisma.TaskWhereInput =
+      topicWhereParts.length === 1 ? topicWhereParts[0]! : { AND: topicWhereParts };
+
     const raw = await prisma.task.findMany({
-      where: dateRangeWhere ? { AND: [topicBranch, dateRangeWhere] } : topicBranch,
+      where: topicWhereFinal,
       include,
     });
 
@@ -144,10 +160,21 @@ export async function GET(req: NextRequest) {
     topicWhere = { topicId: null };
   }
 
-  const listWhere = { ...baseWhere, ...topicWhere, ...doneWhere };
+  const listWhere: Prisma.TaskWhereInput = { ...baseWhere, ...topicWhere, ...doneWhere };
+
+  const mineWhereGeneral: Prisma.TaskWhereInput | null = onlyMine
+    ? { users: { some: { userId: session.userId } } }
+    : null;
+
+  const listParts: Prisma.TaskWhereInput[] = [listWhere];
+  if (mineWhereGeneral) listParts.push(mineWhereGeneral);
+  if (dateRangeWhere) listParts.push(dateRangeWhere);
+
+  const listWhereFinal: Prisma.TaskWhereInput =
+    listParts.length === 1 ? listParts[0]! : { AND: listParts };
 
   const raw = await prisma.task.findMany({
-    where: dateRangeWhere ? { AND: [listWhere, dateRangeWhere] } : listWhere,
+    where: listWhereFinal,
     include,
   });
 
