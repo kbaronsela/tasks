@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { contrastOnBackground, resolveTopicColor } from "@/lib/topic-color";
+import { TopicHubSections } from "@/components/TopicHubSections";
+
+type HubTab = "tasks" | "expenses" | "contacts" | "dates" | "shopping" | "packing";
 
 type User = { id: string; name: string; email: string };
 
@@ -96,7 +99,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [topicFilter, setTopicFilter] = useState<string>("all");
+  /** נושא פעיל לתצוגת המרכז; null כשאין נושאים במערכת */
+  const [focusTopicId, setFocusTopicId] = useState<string | null>(null);
+  const [hubTab, setHubTab] = useState<HubTab>("tasks");
   const [dateFilterFrom, setDateFilterFrom] = useState("");
   const [dateFilterTo, setDateFilterTo] = useState("");
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
@@ -138,7 +143,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [copyInviteHint, setCopyInviteHint] = useState<string | null>(null);
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [draftTopicFilter, setDraftTopicFilter] = useState("all");
   const [draftDateFrom, setDraftDateFrom] = useState("");
   const [draftDateTo, setDraftDateTo] = useState("");
 
@@ -151,8 +155,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
   const loadTasks = useCallback(async () => {
     const params = new URLSearchParams();
-    if (topicFilter !== "all") {
-      params.set("topic", topicFilter);
+    const topicParam = focusTopicId ?? "all";
+    if (topicParam !== "all") {
+      params.set("topic", topicParam);
     }
     if (showCompletedTasks) {
       params.set("showCompleted", "1");
@@ -168,7 +173,19 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     if (!r.ok) throw new Error("טעינת מטלות נכשלה");
     const data = await r.json();
     setTasks(data.tasks);
-  }, [topicFilter, showCompletedTasks, dateFilterFrom, dateFilterTo]);
+  }, [focusTopicId, showCompletedTasks, dateFilterFrom, dateFilterTo]);
+
+  useEffect(() => {
+    if (topics.length === 0) {
+      setFocusTopicId(null);
+      setHubTab("tasks");
+      return;
+    }
+    setFocusTopicId((prev) => {
+      if (prev && topics.some((t) => t.id === prev)) return prev;
+      return topics[0].id;
+    });
+  }, [topics]);
 
   const loadUsers = useCallback(async () => {
     const r = await fetch("/api/users");
@@ -230,13 +247,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setEditTaskId(null);
     setTaskTitle("");
     setTaskDescription("");
-    setTaskTopicId("");
+    setTaskTopicId(focusTopicId ?? "");
     setTaskScheduled("");
     setTaskDue("");
     setTaskUserIds([user.id]);
     setTaskPrereqIds([]);
     setTaskModal(true);
-  }, [user.id]);
+  }, [user.id, focusTopicId]);
 
   const openNewTopicModal = useCallback(() => {
     setTopicModalForTask(false);
@@ -402,6 +419,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTopicColorAuto(true);
     setTopicColorHex("#6366f1");
     await loadTopics();
+    if (newId) setFocusTopicId(newId);
     if (linkingToTask && newId) {
       setTaskTopicId(newId);
       setToast("הנושא נוסף למטלה");
@@ -453,7 +471,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       setError("מחיקה נכשלה");
       return;
     }
-    if (topicFilter === id) setTopicFilter("all");
     if (taskTopicId === id) setTaskTopicId("");
     await loadTopics();
     await loadTasks();
@@ -541,7 +558,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
 
   const inviteTextToCopy = useMemo(() => {
     if (!inviteUrl) return "";
-    return `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול המטלות.\n\nלהרשמה:\n${inviteUrl}\n\nהקישור תקף למספר ימים.`;
+    return `היי,\n\n${user.name} הזמין/ה אותך להצטרף לאתר ניהול הדברים.\n\nלהרשמה:\n${inviteUrl}\n\nהקישור תקף למספר ימים.`;
   }, [inviteUrl, user.name]);
 
   const copyInviteText = async () => {
@@ -561,14 +578,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   }, [tasks, editTaskId]);
 
   const openFilterModal = useCallback(() => {
-    setDraftTopicFilter(topicFilter);
     setDraftDateFrom(dateFilterFrom);
     setDraftDateTo(dateFilterTo);
     setFilterModalOpen(true);
-  }, [topicFilter, dateFilterFrom, dateFilterTo]);
+  }, [dateFilterFrom, dateFilterTo]);
 
   const applyTaskFilters = () => {
-    setTopicFilter(draftTopicFilter);
     setDateFilterFrom(draftDateFrom);
     setDateFilterTo(draftDateTo);
     setFilterModalOpen(false);
@@ -579,10 +594,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   };
 
   const removeAllTaskFilters = () => {
-    setTopicFilter("all");
     setDateFilterFrom("");
     setDateFilterTo("");
-    setDraftTopicFilter("all");
     setDraftDateFrom("");
     setDraftDateTo("");
     setFilterModalOpen(false);
@@ -618,8 +631,29 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           >
             הזמנת משתמשים
           </button>
+          <p className="px-3 pt-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">נושאים</p>
+          <div className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain">
+            {topics.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setFocusTopicId(t.id);
+                  setHubTab("tasks");
+                }}
+                className={`w-full rounded-xl px-3 py-2.5 text-right text-sm font-medium transition-colors ${
+                  focusTopicId === t.id
+                    ? "bg-indigo-100 text-indigo-950 ring-2 ring-indigo-400 dark:bg-indigo-950/60 dark:text-indigo-100 dark:ring-indigo-700"
+                    : "text-zinc-800 hover:bg-zinc-200/80 active:bg-zinc-300/80 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+                }`}
+                style={focusTopicId === t.id ? undefined : topicLabelStyle(t)}
+              >
+                <span className="line-clamp-2 break-words">{t.title}</span>
+              </button>
+            ))}
+          </div>
           <button type="button" className={sidebarNavBtn} onClick={() => setTopicsListModalOpen(true)}>
-            נושאים
+            ניהול נושאים…
           </button>
           <button type="button" className={sidebarNavBtn} onClick={() => void logout()}>
             יציאה
@@ -630,8 +664,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
         <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
           <div className="min-w-0 ps-[4.75rem] lg:ps-0">
-            <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">המטלות שלי</h1>
-            <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
+            <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">ניהול דברים</h1>
+            <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">
+              שלום, {user.name}
+              {focusTopicId && (
+                <>
+                  {" "}
+                  · {topics.find((x) => x.id === focusTopicId)?.title ?? ""}
+                </>
+              )}
+            </p>
           </div>
 
           <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 lg:hidden">
@@ -669,6 +711,28 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     >
                       הזמנת משתמשים
                     </button>
+                    <div className="max-h-40 overflow-y-auto border-b border-zinc-100 px-2 py-1 dark:border-zinc-800">
+                      <p className="px-2 py-1 text-xs text-zinc-500">נושאים</p>
+                      {topics.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          role="menuitem"
+                          className={`w-full rounded-lg px-2 py-2 text-right text-sm ${
+                            focusTopicId === t.id
+                              ? "bg-indigo-100 font-medium text-indigo-950 dark:bg-indigo-950/50 dark:text-indigo-100"
+                              : "text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                          }`}
+                          onClick={() => {
+                            setMoreMenuOpen(false);
+                            setFocusTopicId(t.id);
+                            setHubTab("tasks");
+                          }}
+                        >
+                          {t.title}
+                        </button>
+                      ))}
+                    </div>
                     <button
                       type="button"
                       role="menuitem"
@@ -678,7 +742,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                         setTopicsListModalOpen(true);
                       }}
                     >
-                      נושאים
+                      ניהול נושאים…
                     </button>
                     <button
                       type="button"
@@ -704,6 +768,40 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           </div>
         </header>
 
+      {focusTopicId && topics.length > 0 && (
+        <div
+          className="flex flex-wrap gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800"
+          role="tablist"
+          aria-label="אזורים בנושא"
+        >
+          {(
+            [
+              ["tasks", "מטלות"],
+              ["expenses", "הוצאות"],
+              ["contacts", "אנשי מקצוע"],
+              ["dates", "תאריכים"],
+              ["shopping", "קניות"],
+              ["packing", "לקחת"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={hubTab === id}
+              onClick={() => setHubTab(id)}
+              className={`min-h-10 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                hubTab === id
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
           {error}
@@ -713,6 +811,18 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100">
           {toast}
         </div>
+      )}
+
+      {focusTopicId && hubTab !== "tasks" && (
+        <TopicHubSections
+          topicId={focusTopicId}
+          tab={hubTab}
+          onToast={(msg) => {
+            setToast(msg);
+            setTimeout(() => setToast(null), 3000);
+          }}
+          onError={setError}
+        />
       )}
 
       {filterModalOpen && (
@@ -727,25 +837,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               <h3 className="text-center text-base font-semibold sm:text-lg">סינון מטלות</h3>
             </div>
             <div className="mt-4 flex flex-col gap-4">
-              <label className="flex w-full flex-col gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                <span>סינון לפי נושא</span>
-                <select
-                  value={draftTopicFilter}
-                  onChange={(e) => setDraftTopicFilter(e.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-                >
-                  <option value="all">הכל</option>
-                  <option value="none">ללא נושא</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {draftTopicFilter !== "all" && draftTopicFilter !== "none" && (
+              {focusTopicId && (
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  בנושא נבחר: מוצגות כל המטלות בנושא (גם כאלה שלא משויכות אלייך).
+                  המטלות מסוננות לפי הנושא הנבחר בסרגל הצד. בנושא נבחר מוצגות גם מטלות ללא נושא המשויכות אליך.
                 </p>
               )}
               <div className="flex flex-col gap-2">
@@ -808,6 +902,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         </div>
       )}
 
+      {hubTab === "tasks" && (
       <section className="flex flex-col gap-3 sm:gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -958,6 +1053,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           <p className="text-zinc-500">אין מטלות להצגה בטווח הנבחר.</p>
         )}
       </section>
+      )}
 
       {inviteModalOpen && (
         <div

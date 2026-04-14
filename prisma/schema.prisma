@@ -18,6 +18,7 @@ model User {
   topicsCreated Topic[]     @relation("TopicCreator")
   tasksCreated  Task[]      @relation("TaskCreator")
   invitationsSent Invitation[] @relation("InvitedBy")
+  expensesCreated TopicExpense[] @relation("ExpenseCreator")
 }
 
 model Invitation {
@@ -44,6 +45,77 @@ model Topic {
   createdBy   User?       @relation("TopicCreator", fields: [createdById], references: [id], onDelete: SetNull)
   tasks       Task[]
   users       TopicUser[]
+  expenses    TopicExpense[]
+  professionals TopicProfessional[]
+  events      TopicEvent[]
+  shoppingItems TopicShoppingItem[]
+  packingItems TopicPackingItem[]
+}
+
+model TopicExpense {
+  id          String   @id @default(cuid())
+  topicId     String
+  topic       Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @default("ILS")
+  description String?
+  spentAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
+  createdById String?
+  createdBy   User?    @relation("ExpenseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([topicId, spentAt])
+}
+
+model TopicProfessional {
+  id        String   @id @default(cuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  name      String
+  role      String?
+  phone     String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
+}
+
+model TopicEvent {
+  id        String    @id @default(cuid())
+  topicId   String
+  topic     Topic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title     String
+  startsAt  DateTime
+  endsAt    DateTime?
+  allDay    Boolean   @default(false)
+  location  String?
+  createdAt DateTime  @default(now())
+
+  @@index([topicId, startsAt])
+}
+
+model TopicShoppingItem {
+  id        String   @id @default(cuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title     String
+  done      Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
+}
+
+model TopicPackingItem {
+  id        String   @id @default(cuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title     String
+  packed    Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([topicId])
 }
 
 model TopicUser {

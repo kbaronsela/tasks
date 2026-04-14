@@ -8,8 +8,8 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "המטלות שלי",
-  description: "ניהול מטלות, נושאים ותלויות",
+  title: "ניהול דברים",
+  description: "נושאים, מטלות, הוצאות, אנשי קשר, תאריכים ורשימות",
 };
 
 export const viewport = {

@@ -24,10 +24,10 @@ export async function sendInviteEmail(params: {
     auth: user && pass ? { user, pass } : undefined,
   });
 
-  const subject = "הזמנה להצטרף לאתר המטלות";
+  const subject = "הזמנה להצטרף לאתר ניהול הדברים";
   const text = `שלום,
 
-${params.inviterName} הזמין/ה אותך להצטרף לאתר ניהול המטלות.
+${params.inviterName} הזמין/ה אותך להצטרף לאתר ניהול הדברים.
 
 פתח/י את הקישור להרשמה:
 ${params.inviteUrl}
@@ -36,7 +36,7 @@ ${params.inviteUrl}
 `;
   const html = `
   <p>שלום,</p>
-  <p><strong>${escapeHtml(params.inviterName)}</strong> הזמין/ה אותך להצטרף לאתר ניהול המטלות.</p>
+  <p><strong>${escapeHtml(params.inviterName)}</strong> הזמין/ה אותך להצטרף לאתר ניהול הדברים.</p>
   <p><a href="${escapeHtml(params.inviteUrl)}">לחצי כאן להרשמה</a></p>
   <p style="color:#666;font-size:12px">אם לא ביקשת את ההזמנה, אפשר להתעלם מהמייל.</p>
   `;
