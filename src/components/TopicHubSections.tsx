@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { isContactPickerSupported, pickContactFromDevice } from "@/lib/contactPicker";
+import { decodeVcfFileBytes, parseVcfText } from "@/lib/parseVcf";
 
 type HubUser = { id: string; name: string; email: string };
 
@@ -57,6 +59,18 @@ function formatHe(iso: string | null): string {
     dateStyle: "short",
     timeStyle: "short",
   });
+}
+
+function splitPhoneLines(phone: string): string[] {
+  return phone
+    .split(/[\n;|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function telHref(segment: string): string {
+  const digits = segment.replace(/[^\d+]/g, "").replace(/^00/, "+");
+  return digits ? `tel:${digits}` : "#";
 }
 
 const btnSecondary =
@@ -157,6 +171,12 @@ export function TopicHubSections({
     };
   }, [tab, topicId, loadExpenses, loadProfessionals, loadEvents, loadShopping, loadPacking, onError]);
 
+  const contactPickerSupported = useSyncExternalStore(
+    () => () => {},
+    isContactPickerSupported,
+    () => false,
+  );
+
   const expenseTotal = useMemo(() => {
     let s = 0;
     for (const e of expenses) {
@@ -244,6 +264,64 @@ export function TopicHubSections({
     setPNotes("");
     await loadProfessionals();
     onToast("נוסף לאנשי הקשר");
+  };
+
+  const onVcfFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const buf = reader.result;
+      if (!(buf instanceof ArrayBuffer)) {
+        onError("קריאת הקובץ נכשלה");
+        return;
+      }
+      const text = decodeVcfFileBytes(buf);
+      const parsed = parseVcfText(text);
+      if (!parsed) {
+        onError("לא ניתן לקרוא את קובץ ה־VCF");
+        return;
+      }
+      const { contact, cardCount } = parsed;
+      setPName(contact.name);
+      setPPhone(contact.phones.join("\n"));
+      setPRole(contact.role ?? "");
+      setPNotes(contact.notes ?? "");
+      onError(null);
+      if (contact.phones.length === 0) {
+        onToast(
+          cardCount > 1
+            ? `נטען איש הקשר הראשון מתוך ${cardCount} — לא נמצאו מספרי טלפון; ניתן להזין ידנית`
+            : "השדות מולאו מהכרטיס; לא נמצאו מספרי טלפון — ניתן להזין ידנית",
+        );
+      } else if (cardCount > 1) {
+        onToast(`נטען איש הקשר הראשון מתוך ${cardCount} בקובץ`);
+      } else {
+        onToast("השדות מולאו מהכרטיס");
+      }
+    };
+    reader.onerror = () => onError("קריאת הקובץ נכשלה");
+    reader.readAsArrayBuffer(file);
+  };
+
+  const onPickDeviceContact = async () => {
+    onError(null);
+    try {
+      const contact = await pickContactFromDevice();
+      if (!contact) return;
+      setPName(contact.name);
+      setPPhone(contact.phones.join("\n"));
+      setPRole(contact.role ?? "");
+      setPNotes(contact.notes ?? "");
+      if (contact.phones.length === 0) {
+        onToast("השדות מולאו מהמכשיר; לא נמצאו מספרי טלפון — ניתן להזין ידנית");
+      } else {
+        onToast("השדות מולאו מאיש הקשר במכשיר");
+      }
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "לא ניתן לקרוא איש קשר מהמכשיר");
+    }
   };
 
   const delProfessional = async (id: string) => {
@@ -511,9 +589,42 @@ export function TopicHubSections({
   }
 
   if (tab === "contacts") {
+    const vcfInputId = `vcf-import-${topicId}`;
     return (
       <div className="flex flex-col gap-4">
         <form onSubmit={addProfessional} className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              ניתן למלא ידנית, לבחור איש קשר מהמכשיר (כשהדפדפן מאפשר), או לייבא קובץ VCF.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {contactPickerSupported && (
+                <button
+                  type="button"
+                  onClick={() => void onPickDeviceContact()}
+                  className={btnSecondary}
+                >
+                  בחירה מאנשי הקשר במכשיר
+                </button>
+              )}
+              <input
+                id={vcfInputId}
+                type="file"
+                accept=".vcf,text/vcard,text/x-vcard"
+                className="sr-only"
+                onChange={onVcfFile}
+              />
+              <label htmlFor={vcfInputId} className={`${btnSecondary} cursor-pointer`}>
+                ייבוא מקובץ VCF
+              </label>
+            </div>
+            {!contactPickerSupported && (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                בדפדפן או במערכת הזו אין גישה ישירה לאנשי הקשר (למשל Safari באייפון). אפשר לייבא קובץ VCF
+                מהאנשים או למלא ידנית.
+              </p>
+            )}
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               שם
@@ -526,12 +637,14 @@ export function TopicHubSections({
             </label>
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               טלפון
-              <input
+              <textarea
                 required
                 inputMode="tel"
                 value={pPhone}
                 onChange={(e) => setPPhone(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                rows={2}
+                placeholder="מספר אחד או כמה בשורות נפרדות"
+                className="mt-1 min-h-11 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
               />
             </label>
           </div>
@@ -567,9 +680,17 @@ export function TopicHubSections({
             >
               <div className="font-medium">{p.name}</div>
               {p.role && <div className="text-sm text-zinc-600 dark:text-zinc-400">{p.role}</div>}
-              <a href={`tel:${p.phone.replace(/\s/g, "")}`} className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-                {p.phone}
-              </a>
+              <div className="flex flex-col gap-0.5 text-sm">
+                {splitPhoneLines(p.phone).map((seg, i) => (
+                  <a
+                    key={`${p.id}-tel-${i}`}
+                    href={telHref(seg)}
+                    className="text-indigo-600 hover:underline dark:text-indigo-400"
+                  >
+                    {seg}
+                  </a>
+                ))}
+              </div>
               {p.notes && <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{p.notes}</p>}
               <button
                 type="button"
