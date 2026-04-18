@@ -20,6 +20,24 @@ model User {
   invitationsSent Invitation[] @relation("InvitedBy")
   expensesCreated TopicExpense[] @relation("ExpenseCreator")
   expensesAssigned TopicExpense[] @relation("ExpenseAssignedTo")
+  dailyPlanItems DailyPlanItem[]
+}
+
+/// שורה בתכנון יומי — לפי משתמש ותאריך לוח שנה
+model DailyPlanItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// יום (ללא אזור זמן — נשמר כ־DATE ב־Postgres)
+  day       DateTime @db.Date
+  /// דקות מתחילת היום (0–1439) למיון ותצוגה
+  timeMin   Int
+  label     String
+  note      String?
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, day])
 }
 
 model Invitation {

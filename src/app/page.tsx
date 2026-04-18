@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { TaskDashboard } from "@/components/TaskDashboard";
+import { DailyPlanner } from "@/components/DailyPlanner";
+
+export const metadata: Metadata = {
+  title: "תכנון יומי",
+};
 
 export default async function Home() {
   const session = await getSession();
@@ -9,8 +14,6 @@ export default async function Home() {
   }
 
   return (
-    <TaskDashboard
-      user={{ id: session.userId, email: session.email, name: session.name }}
-    />
+    <DailyPlanner user={{ id: session.userId, email: session.email, name: session.name }} />
   );
 }

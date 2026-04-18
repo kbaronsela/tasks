@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
@@ -635,6 +636,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         aria-label="תפריט צד"
       >
         <nav className="flex flex-col gap-1 p-4 pt-6">
+          <Link href="/" className={sidebarNavBtn}>
+            תכנון יומי
+          </Link>
           <button
             type="button"
             className={sidebarNavBtn}
@@ -711,6 +715,14 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     className="absolute right-0 top-full z-40 mt-1 min-w-[12rem] rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                     role="menu"
                   >
+                    <Link
+                      href="/"
+                      role="menuitem"
+                      className="block w-full px-4 py-2.5 text-right text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => setMoreMenuOpen(false)}
+                    >
+                      תכנון יומי
+                    </Link>
                     <button
                       type="button"
                       role="menuitem"

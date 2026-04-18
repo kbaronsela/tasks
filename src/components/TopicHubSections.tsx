@@ -76,6 +76,24 @@ function telHref(segment: string): string {
 const btnSecondary =
   "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800";
 
+const btnPrimaryAdd =
+  "inline-flex min-h-11 w-full touch-manipulation items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 sm:w-auto";
+
+function AddContactModalCloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute left-0 top-0 inline-flex size-10 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+      aria-label="ביטול"
+    >
+      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
 export function TopicHubSections({
   topicId,
   tab,
@@ -103,6 +121,7 @@ export function TopicHubSections({
   const [pRole, setPRole] = useState("");
   const [pPhone, setPPhone] = useState("");
   const [pNotes, setPNotes] = useState("");
+  const [addContactModalOpen, setAddContactModalOpen] = useState(false);
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [evTitle, setEvTitle] = useState("");
@@ -170,6 +189,13 @@ export function TopicHubSections({
       cancelled = true;
     };
   }, [tab, topicId, loadExpenses, loadProfessionals, loadEvents, loadShopping, loadPacking, onError]);
+
+  useEffect(() => {
+    if (tab !== "contacts") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- סנכרון: יציאה מהטאב סוגרת את מודל ההוספה
+      setAddContactModalOpen(false);
+    }
+  }, [tab]);
 
   const contactPickerSupported = useSyncExternalStore(
     () => () => {},
@@ -262,9 +288,37 @@ export function TopicHubSections({
     setPRole("");
     setPPhone("");
     setPNotes("");
+    setAddContactModalOpen(false);
     await loadProfessionals();
     onToast("נוסף לאנשי הקשר");
   };
+
+  const resetAddContactForm = useCallback(() => {
+    setPName("");
+    setPRole("");
+    setPPhone("");
+    setPNotes("");
+    onError(null);
+  }, [onError]);
+
+  const closeAddContactModal = useCallback(() => {
+    resetAddContactForm();
+    setAddContactModalOpen(false);
+  }, [resetAddContactForm]);
+
+  const openAddContactModal = useCallback(() => {
+    resetAddContactForm();
+    setAddContactModalOpen(true);
+  }, [resetAddContactForm]);
+
+  useEffect(() => {
+    if (!addContactModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeAddContactModal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [addContactModalOpen, closeAddContactModal]);
 
   const onVcfFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -592,86 +646,120 @@ export function TopicHubSections({
     const vcfInputId = `vcf-import-${topicId}`;
     return (
       <div className="flex flex-col gap-4">
-        <form onSubmit={addProfessional} className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              ניתן למלא ידנית, לבחור איש קשר מהמכשיר (כשהדפדפן מאפשר), או לייבא קובץ VCF.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {contactPickerSupported && (
-                <button
-                  type="button"
-                  onClick={() => void onPickDeviceContact()}
-                  className={btnSecondary}
-                >
-                  בחירה מאנשי הקשר במכשיר
-                </button>
-              )}
-              <input
-                id={vcfInputId}
-                type="file"
-                accept=".vcf,text/vcard,text/x-vcard"
-                className="sr-only"
-                onChange={onVcfFile}
-              />
-              <label htmlFor={vcfInputId} className={`${btnSecondary} cursor-pointer`}>
-                ייבוא מקובץ VCF
-              </label>
-            </div>
-            {!contactPickerSupported && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                בדפדפן או במערכת הזו אין גישה ישירה לאנשי הקשר (למשל Safari באייפון). אפשר לייבא קובץ VCF
-                מהאנשים או למלא ידנית.
-              </p>
-            )}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              שם
-              <input
-                required
-                value={pName}
-                onChange={(e) => setPName(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
-              />
-            </label>
-            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              טלפון
-              <textarea
-                required
-                inputMode="tel"
-                value={pPhone}
-                onChange={(e) => setPPhone(e.target.value)}
-                rows={2}
-                placeholder="מספר אחד או כמה בשורות נפרדות"
-                className="mt-1 min-h-11 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
-              />
-            </label>
-          </div>
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            תפקיד / תיאור קצר
-            <input
-              value={pRole}
-              onChange={(e) => setPRole(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
-            />
-          </label>
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            הערות
-            <textarea
-              value={pNotes}
-              onChange={(e) => setPNotes(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
-            />
-          </label>
-          <button
-            type="submit"
-            className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+        <button type="button" onClick={openAddContactModal} className={btnPrimaryAdd}>
+          הוספת איש קשר
+        </button>
+
+        {addContactModalOpen && (
+          <div
+            className="fixed inset-0 z-[60] flex min-h-dvh min-h-[100svh] items-center justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-contact-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeAddContactModal();
+            }}
           >
-            הוספה
-          </button>
-        </form>
+            <div className="relative my-auto w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 sm:p-5">
+              <div className="relative mb-4 flex min-h-10 items-center justify-center pe-10">
+                <AddContactModalCloseButton onClick={closeAddContactModal} />
+                <h2 id="add-contact-modal-title" className="text-center text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                  הוספת איש קשר
+                </h2>
+              </div>
+              <form onSubmit={addProfessional} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    ניתן למלא ידנית, לבחור איש קשר מהמכשיר (כשהדפדפן מאפשר), או לייבא קובץ VCF.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {contactPickerSupported && (
+                      <button
+                        type="button"
+                        onClick={() => void onPickDeviceContact()}
+                        className={btnSecondary}
+                      >
+                        בחירה מאנשי הקשר במכשיר
+                      </button>
+                    )}
+                    <input
+                      id={vcfInputId}
+                      type="file"
+                      accept=".vcf,text/vcard,text/x-vcard"
+                      className="sr-only"
+                      onChange={onVcfFile}
+                    />
+                    <label htmlFor={vcfInputId} className={`${btnSecondary} cursor-pointer`}>
+                      ייבוא מקובץ VCF
+                    </label>
+                  </div>
+                  {!contactPickerSupported && (
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      בדפדפן או במערכת הזו אין גישה ישירה לאנשי הקשר (למשל Safari באייפון). אפשר לייבא קובץ VCF
+                      מהאנשים או למלא ידנית.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    שם
+                    <input
+                      required
+                      value={pName}
+                      onChange={(e) => setPName(e.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                    />
+                  </label>
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    טלפון
+                    <textarea
+                      required
+                      inputMode="tel"
+                      value={pPhone}
+                      onChange={(e) => setPPhone(e.target.value)}
+                      rows={2}
+                      placeholder="מספר אחד או כמה בשורות נפרדות"
+                      className="mt-1 min-h-11 w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                    />
+                  </label>
+                </div>
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  תפקיד / תיאור קצר
+                  <input
+                    value={pRole}
+                    onChange={(e) => setPRole(e.target.value)}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  />
+                </label>
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  הערות
+                  <textarea
+                    value={pNotes}
+                    onChange={(e) => setPNotes(e.target.value)}
+                    rows={2}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-600 dark:bg-zinc-800"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={closeAddContactModal}
+                    className={`${btnSecondary} min-h-11 flex-1 sm:flex-initial`}
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="submit"
+                    className="min-h-11 flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:flex-initial"
+                  >
+                    הוספה
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         <ul className="flex flex-col gap-2">
           {professionals.map((p) => (
             <li
