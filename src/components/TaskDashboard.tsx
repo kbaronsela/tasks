@@ -15,6 +15,7 @@ type Topic = {
   id: string;
   title: string;
   color: string | null;
+  archived: boolean;
   createdAt: string;
   taskCount: number;
   users: User[];
@@ -98,6 +99,7 @@ function ModalCloseButton({
 export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [showArchivedTopics, setShowArchivedTopics] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   /** נושא פעיל לתצוגת המרכז; null כשאין נושאים במערכת */
@@ -157,6 +159,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTopics(data.topics);
   }, []);
 
+  const displayTopics = useMemo(
+    () => (showArchivedTopics ? topics : topics.filter((t) => !t.archived)),
+    [topics, showArchivedTopics],
+  );
+
   const loadTasks = useCallback(async () => {
     const params = new URLSearchParams();
     const topicParam = focusTopicId ?? "all";
@@ -183,17 +190,17 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   }, [focusTopicId, showCompletedTasks, dateFilterFrom, dateFilterTo, onlyMyTasks]);
 
   useEffect(() => {
-    if (topics.length === 0) {
+    if (displayTopics.length === 0) {
       setFocusTopicId(null);
       setHubTab("tasks");
       setOnlyMyTasks(false);
       return;
     }
     setFocusTopicId((prev) => {
-      if (prev && topics.some((t) => t.id === prev)) return prev;
-      return topics[0].id;
+      if (prev && displayTopics.some((t) => t.id === prev)) return prev;
+      return displayTopics[0].id;
     });
-  }, [topics]);
+  }, [displayTopics]);
 
   const loadUsers = useCallback(async () => {
     const r = await fetch("/api/users");
@@ -486,6 +493,24 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const setTopicArchived = async (id: string, archived: boolean) => {
+    setError(null);
+    const r = await fetch(`/api/topics/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error ?? "עדכון נכשל");
+      return;
+    }
+    await loadTopics();
+    await loadTasks();
+    setToast(archived ? "הנושא הועבר לארכיון" : "הנושא הוחזר מהארכיון");
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const submitTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -648,7 +673,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           </button>
           <p className="px-3 pt-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">נושאים</p>
           <div className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain">
-            {topics.map((t) => (
+            {displayTopics.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -685,7 +710,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               {focusTopicId && (
                 <>
                   {" "}
-                  · {topics.find((x) => x.id === focusTopicId)?.title ?? ""}
+                  · {displayTopics.find((x) => x.id === focusTopicId)?.title ?? ""}
                 </>
               )}
             </p>
@@ -736,7 +761,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     </button>
                     <div className="max-h-40 overflow-y-auto border-b border-zinc-100 px-2 py-1 dark:border-zinc-800">
                       <p className="px-2 py-1 text-xs text-zinc-500">נושאים</p>
-                      {topics.map((t) => (
+                      {displayTopics.map((t) => (
                         <button
                           key={t.id}
                           type="button"
@@ -791,7 +816,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           </div>
         </header>
 
-      {focusTopicId && topics.length > 0 && (
+      {focusTopicId && displayTopics.length > 0 && (
         <div
           className="flex flex-wrap gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800"
           role="tablist"
@@ -1160,16 +1185,37 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </button>
               </div>
             </div>
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-zinc-800 dark:text-zinc-200">
+              <input
+                type="checkbox"
+                checked={showArchivedTopics}
+                onChange={(e) => setShowArchivedTopics(e.target.checked)}
+                className="mt-0.5 size-5 shrink-0 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>
+                הצג נושאים בארכיון
+                <span className="mt-0.5 block text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                  נושאים שהעברת לארכיון מוסתרים ברשימה עד שמסמנים כאן
+                </span>
+              </span>
+            </label>
             <ul className="mt-4 flex flex-col gap-2">
-              {topics.map((t) => (
+              {displayTopics.map((t) => (
                 <li
                   key={t.id}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-zinc-200/80 px-3 py-2.5 text-sm sm:flex-nowrap dark:border-zinc-600"
+                  className={`flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-zinc-200/80 px-3 py-2.5 text-sm sm:flex-nowrap dark:border-zinc-600 ${
+                    t.archived ? "opacity-75" : ""
+                  }`}
                   style={topicLabelStyle(t)}
                 >
-                  <span className="min-w-0 flex-1 break-words font-medium">{t.title}</span>
+                  <span className="min-w-0 flex-1 break-words font-medium">
+                    {t.title}
+                    {t.archived ? (
+                      <span className="me-1.5 text-xs font-normal text-zinc-600 dark:text-zinc-400"> (בארכיון)</span>
+                    ) : null}
+                  </span>
                   <span className="shrink-0 opacity-90">({t.taskCount})</span>
-                  <div className="flex w-full shrink-0 justify-end gap-2 sm:mr-auto sm:w-auto sm:justify-start">
+                  <div className="flex w-full shrink-0 flex-wrap justify-end gap-2 sm:mr-auto sm:w-auto sm:justify-start">
                     <button
                       type="button"
                       className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
@@ -1177,6 +1223,23 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     >
                       עריכה
                     </button>
+                    {t.archived ? (
+                      <button
+                        type="button"
+                        className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
+                        onClick={() => void setTopicArchived(t.id, false)}
+                      >
+                        החזר מהארכיון
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
+                        onClick={() => void setTopicArchived(t.id, true)}
+                      >
+                        ארכיון
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium text-red-900 hover:bg-red-100/90 hover:underline active:bg-red-200/90 dark:text-red-100 dark:hover:bg-red-950/50"
@@ -1190,6 +1253,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
             </ul>
             {topics.length === 0 && (
               <p className="mt-4 text-sm text-zinc-500">אין נושאים עדיין.</p>
+            )}
+            {topics.length > 0 && displayTopics.length === 0 && (
+              <p className="mt-4 text-sm text-zinc-500">אין נושאים פעילים. סמנו &quot;הצג נושאים בארכיון&quot; כדי לראות נושאים שהעברת לארכיון.</p>
             )}
           </div>
         </div>

@@ -84,6 +84,8 @@ model Invitation {
 model Topic {
   id          String      @id @default(cuid())
   title       String
+  /// נושא שהושלם / הועבר לארכיון — מוסתר מהרשימה עד שמבקשים להציג
+  archived    Boolean     @default(false)
   /// Hex כמו #aabbcc; null = צבע אוטומטי ייחודי לפי id
   color       String?
   createdAt   DateTime    @default(now())

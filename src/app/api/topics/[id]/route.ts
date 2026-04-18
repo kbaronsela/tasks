@@ -19,14 +19,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
-  let body: { title?: string; userIds?: string[]; color?: unknown };
+  let body: { title?: string; userIds?: string[]; color?: unknown; archived?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "גוף בקשה לא תקין" }, { status: 400 });
   }
 
-  const data: { title?: string; color?: string | null } = {};
+  const data: { title?: string; color?: string | null; archived?: boolean } = {};
   if (body.title !== undefined) {
     const title = String(body.title).trim();
     if (!title) return NextResponse.json({ error: "כותרת ריקה" }, { status: 400 });
@@ -41,6 +41,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (colorParsed.kind === "value") {
       data.color = colorParsed.color;
     }
+  }
+
+  if (body.archived !== undefined) {
+    data.archived = Boolean(body.archived);
   }
 
   if (body.userIds !== undefined) {
@@ -73,6 +77,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       id: topic.id,
       title: topic.title,
       color: topic.color,
+      archived: topic.archived,
       createdAt: topic.createdAt,
       taskCount: topic._count.tasks,
       users: topic.users.map((u) => u.user),
