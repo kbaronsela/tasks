@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
 import { wouldCreateDependencyCycle } from "@/lib/dependency-graph";
 import { toTaskApiJson } from "@/lib/task-api-map";
+import { syncTaskToDailyPlan } from "@/lib/task-daily-plan-sync";
 
 function parseDate(s: string | null): Date | null {
   if (s === null || s === "") return null;
@@ -130,6 +131,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },
+  });
+
+  await syncTaskToDailyPlan(session.userId, {
+    id: full.id,
+    title: full.title,
+    scheduledAt: full.scheduledAt,
   });
 
   return NextResponse.json({

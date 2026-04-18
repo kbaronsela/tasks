@@ -63,7 +63,11 @@ model DailyPlanItem {
   note      String?
   done      Boolean  @default(false)
   createdAt DateTime @default(now())
+  /// אם נוצר ממטלה עם מועד לביצוע — סנכרון שעה/תאריך/כותרת
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, taskId])
   @@index([userId, day])
 }
 
@@ -194,6 +198,7 @@ model Task {
   users         TaskUser[]
   dependsOn     TaskDependency[] @relation("DependentTask")
   dependents    TaskDependency[] @relation("PrerequisiteTask")
+  dailyPlanItems DailyPlanItem[]
 }
 
 model TaskUser {

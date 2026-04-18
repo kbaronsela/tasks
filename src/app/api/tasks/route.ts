@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
 import { wouldCreateDependencyCycle } from "@/lib/dependency-graph";
 import { toTaskApiJson, type TaskApiInclude } from "@/lib/task-api-map";
+import { syncTaskToDailyPlan } from "@/lib/task-daily-plan-sync";
 
 function parseDate(s: string | null | undefined): Date | null {
   if (!s) return null;
@@ -271,6 +272,12 @@ export async function POST(req: NextRequest) {
       users: { include: { user: { select: { id: true, name: true, email: true } } } },
       dependsOn: { include: { dependsOn: { select: { id: true, title: true, done: true } } } },
     },
+  });
+
+  await syncTaskToDailyPlan(session.userId, {
+    id: full.id,
+    title: full.title,
+    scheduledAt: full.scheduledAt,
   });
 
   return NextResponse.json({
