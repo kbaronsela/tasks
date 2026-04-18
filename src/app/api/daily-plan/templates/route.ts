@@ -37,6 +37,7 @@ export async function GET() {
     seen.add(lab);
     if (hiddenSet.has(lab)) continue;
     if (pinnedLabels.has(lab)) continue;
+    if (r.timeMin == null) continue;
     suggestions.push({ label: lab, timeMin: r.timeMin });
     if (suggestions.length >= 50) break;
   }

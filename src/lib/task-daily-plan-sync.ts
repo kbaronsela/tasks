@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { findInsertIndexForTimed } from "@/lib/daily-plan-position";
 
 /** אזור זמן לחילוץ יום ושעה ממועד לביצוע (מיושר לתכנון היומי) */
 const SCHEDULE_TIMEZONE = "Asia/Jerusalem";
@@ -48,23 +49,34 @@ export async function syncTaskToDailyPlan(userId: string, task: TaskSyncFields):
 
   const { day, timeMin } = scheduledAtToDayAndTimeMin(task.scheduledAt);
 
-  await prisma.dailyPlanItem.upsert({
-    where: {
-      userId_taskId: { userId, taskId: task.id },
-    },
-    create: {
-      userId,
-      taskId: task.id,
-      day,
-      timeMin,
-      label: task.title.slice(0, 500),
-      note: null,
-      done: false,
-    },
-    update: {
-      day,
-      timeMin,
-      label: task.title.slice(0, 500),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.dailyPlanItem.deleteMany({
+      where: { userId, taskId: task.id },
+    });
+
+    const rows = await tx.dailyPlanItem.findMany({
+      where: { userId, day },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      select: { id: true, timeMin: true },
+    });
+    const insertPos = findInsertIndexForTimed(rows, timeMin);
+
+    await tx.dailyPlanItem.updateMany({
+      where: { userId, day, position: { gte: insertPos } },
+      data: { position: { increment: 1 } },
+    });
+
+    await tx.dailyPlanItem.create({
+      data: {
+        userId,
+        taskId: task.id,
+        day,
+        timeMin,
+        position: insertPos,
+        label: task.title.slice(0, 500),
+        note: null,
+        done: false,
+      },
+    });
   });
 }

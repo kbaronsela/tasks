@@ -57,8 +57,10 @@ model DailyPlanItem {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// יום (ללא אזור זמן — נשמר כ־DATE ב־Postgres)
   day       DateTime @db.Date
-  /// דקות מתחילת היום (0–1439) למיון ותצוגה
-  timeMin   Int
+  /// דקות מתחילת היום (0–1439) — null = ללא שעה (מיון ידני בגרירה)
+  timeMin   Int?
+  /// סדר תצוגה ביום (0…n−1)
+  position  Int
   label     String
   note      String?
   done      Boolean  @default(false)
@@ -69,6 +71,7 @@ model DailyPlanItem {
 
   @@unique([userId, taskId])
   @@index([userId, day])
+  @@index([userId, day, position])
 }
 
 model Invitation {

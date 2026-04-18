@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
+import { findInsertIndexForTimed } from "@/lib/daily-plan-position";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -12,7 +13,7 @@ function ymdToUtcDate(ymd: string): Date | null {
 function jsonItem(row: {
   id: string;
   day: Date;
-  timeMin: number;
+  timeMin: number | null;
   label: string;
   done: boolean;
   createdAt: Date;
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
 
   const rows = await prisma.dailyPlanItem.findMany({
     where: { userId: session.userId, day },
-    orderBy: [{ timeMin: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
 
   return NextResponse.json({ items: rows.map(jsonItem) });
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const { session, response } = await requireUser();
   if (!session) return response!;
 
-  let body: { date?: string; timeMin?: number; label?: string };
+  let body: { date?: string; timeMin?: number | null; label?: string };
   try {
     body = await req.json();
   } catch {
@@ -65,9 +66,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "תאריך לא תקין (YYYY-MM-DD)" }, { status: 400 });
   }
 
-  const timeMin = Number(body.timeMin);
-  if (!Number.isInteger(timeMin) || timeMin < 0 || timeMin > 1439) {
-    return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
+  let timeMin: number | null = null;
+  if (body.timeMin !== undefined && body.timeMin !== null) {
+    const t = Number(body.timeMin);
+    if (!Number.isInteger(t) || t < 0 || t > 1439) {
+      return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
+    }
+    timeMin = t;
   }
 
   const label = String(body.label ?? "").trim();
@@ -75,14 +80,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "נדרש תיאור לפעולה" }, { status: 400 });
   }
 
-  const row = await prisma.dailyPlanItem.create({
-    data: {
-      userId: session.userId,
-      day,
-      timeMin,
-      label: label.slice(0, 500),
-      note: null,
-    },
+  const row = await prisma.$transaction(async (tx) => {
+    const rows = await tx.dailyPlanItem.findMany({
+      where: { userId: session.userId, day },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      select: { id: true, timeMin: true },
+    });
+    const insertPos = timeMin === null ? rows.length : findInsertIndexForTimed(rows, timeMin);
+    await tx.dailyPlanItem.updateMany({
+      where: { userId: session.userId, day, position: { gte: insertPos } },
+      data: { position: { increment: 1 } },
+    });
+    return tx.dailyPlanItem.create({
+      data: {
+        userId: session.userId,
+        day,
+        timeMin,
+        position: insertPos,
+        label: label.slice(0, 500),
+        note: null,
+      },
+    });
   });
 
   return NextResponse.json({ item: jsonItem(row) });

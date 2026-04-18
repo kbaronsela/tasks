@@ -9,7 +9,7 @@ type User = { id: string; name: string; email: string };
 type PlanItem = {
   id: string;
   date: string;
-  timeMin: number;
+  timeMin: number | null;
   label: string;
   done: boolean;
   createdAt: string;
@@ -56,29 +56,69 @@ type InlinePlanRowProps = {
   setError: (msg: string | null) => void;
   onToggleDone: () => void;
   onRemove: () => void;
+  onDropOnRow: (draggedId: string, targetId: string) => void | Promise<void>;
+  draggingId: string | null;
+  setDraggingId: (id: string | null) => void;
 };
 
-function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: InlinePlanRowProps) {
-  const [time, setTime] = useState(() => minutesToHHMM(item.timeMin));
+function InlinePlanRow({
+  item,
+  loadItems,
+  setError,
+  onToggleDone,
+  onRemove,
+  onDropOnRow,
+  draggingId,
+  setDraggingId,
+}: InlinePlanRowProps) {
+  const hasServerTime = item.timeMin !== null;
+  const [showTimePicker, setShowTimePicker] = useState(hasServerTime);
+  const [time, setTime] = useState(() => (hasServerTime ? minutesToHHMM(item.timeMin as number) : "09:00"));
   const [label, setLabel] = useState(item.label);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setTime(minutesToHHMM(item.timeMin));
+    const ht = item.timeMin !== null;
+    setShowTimePicker(ht);
+    setTime(ht ? minutesToHHMM(item.timeMin as number) : "09:00");
     setLabel(item.label);
   }, [item.id, item.timeMin, item.label]);
 
   const save = useCallback(async () => {
-    const timeMin = hhmmToMinutes(time);
-    if (timeMin === null) {
-      setError("שעה לא תקינה");
-      setTime(minutesToHHMM(item.timeMin));
-      return;
-    }
     const labelT = label.trim();
     if (!labelT) {
       setError("נא למלא כותרת");
       setLabel(item.label);
+      return;
+    }
+
+    if (!showTimePicker) {
+      if (item.timeMin === null && labelT === item.label) return;
+      setSaving(true);
+      setError(null);
+      try {
+        const r = await fetch(`/api/daily-plan/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timeMin: null, label: labelT }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setError((data as { error?: string }).error ?? "שמירה נכשלה");
+          setLabel(item.label);
+          return;
+        }
+        await loadItems();
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const timeMin = hhmmToMinutes(time);
+    if (timeMin === null) {
+      setError("שעה לא תקינה");
+      setTime(item.timeMin !== null ? minutesToHHMM(item.timeMin) : "09:00");
       return;
     }
     if (timeMin === item.timeMin && labelT === item.label) {
@@ -95,7 +135,7 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         setError((data as { error?: string }).error ?? "שמירה נכשלה");
-        setTime(minutesToHHMM(item.timeMin));
+        setTime(item.timeMin !== null ? minutesToHHMM(item.timeMin) : "09:00");
         setLabel(item.label);
         return;
       }
@@ -103,7 +143,33 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
     } finally {
       setSaving(false);
     }
-  }, [item, time, label, loadItems, setError]);
+  }, [item, time, label, loadItems, setError, showTimePicker]);
+
+  const clearTime = useCallback(async () => {
+    setShowTimePicker(false);
+    setSaving(true);
+    setError(null);
+    try {
+      const labelT = label.trim();
+      if (!labelT) {
+        setError("נא למלא כותרת");
+        return;
+      }
+      const r = await fetch(`/api/daily-plan/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeMin: null, label: labelT }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((data as { error?: string }).error ?? "שמירה נכשלה");
+        return;
+      }
+      await loadItems();
+    } finally {
+      setSaving(false);
+    }
+  }, [item.id, label, loadItems, setError]);
 
   const rowBorder = item.done
     ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
@@ -112,8 +178,32 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
   const fieldBase =
     "rounded border border-transparent bg-transparent px-1 py-0.5 text-inherit outline-none transition-colors focus:border-indigo-400 focus:bg-white/90 dark:focus:bg-zinc-900/90";
 
+  const draggable = item.timeMin === null;
+
   return (
-    <li className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 ${rowBorder}`}>
+    <li
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (!draggable) return;
+        e.dataTransfer.setData("text/plain", item.id);
+        e.dataTransfer.effectAllowed = "move";
+        setDraggingId(item.id);
+      }}
+      onDragEnd={() => setDraggingId(null)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData("text/plain");
+        if (!draggedId || draggedId === item.id) return;
+        void onDropOnRow(draggedId, item.id);
+      }}
+      className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 ${rowBorder} ${
+        draggable ? "cursor-grab active:cursor-grabbing" : ""
+      } ${draggingId === item.id ? "opacity-60" : ""}`}
+    >
       <button
         type="button"
         onClick={onToggleDone}
@@ -130,15 +220,42 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            onBlur={() => void save()}
-            disabled={saving}
-            className={`${fieldBase} w-[5.25rem] shrink-0 text-sm font-medium tabular-nums tracking-tight text-indigo-700 dark:text-indigo-300`}
-            aria-label="שעה"
-          />
+          {showTimePicker ? (
+            <>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                onBlur={() => void save()}
+                disabled={saving}
+                className={`${fieldBase} w-[5.25rem] shrink-0 text-sm font-medium tabular-nums tracking-tight text-indigo-700 dark:text-indigo-300`}
+                aria-label="שעה"
+              />
+              <button
+                type="button"
+                onClick={() => void clearTime()}
+                disabled={saving}
+                className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-zinc-500 underline-offset-2 hover:text-indigo-600 hover:underline disabled:opacity-50 dark:text-zinc-400 dark:hover:text-indigo-400"
+              >
+                ללא שעה
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="w-[5.25rem] shrink-0 text-sm font-medium text-zinc-500 dark:text-zinc-400">ללא שעה</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTimePicker(true);
+                  setTime("09:00");
+                }}
+                disabled={saving}
+                className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-indigo-600 underline-offset-2 hover:underline disabled:opacity-50 dark:text-indigo-400"
+              >
+                שעה
+              </button>
+            </>
+          )}
           <input
             type="text"
             value={label}
@@ -201,6 +318,8 @@ export function DailyPlanner({ user }: { user: User }) {
   const [pickModalOpen, setPickModalOpen] = useState(false);
   const [formTime, setFormTime] = useState("09:00");
   const [formLabel, setFormLabel] = useState("");
+  const [formNoTime, setFormNoTime] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
     const r = await fetch(`/api/daily-plan?date=${encodeURIComponent(dateYmd)}`);
@@ -247,10 +366,12 @@ export function DailyPlanner({ user }: { user: User }) {
   const openNew = () => {
     setFormTime(minutesToHHMM(9 * 60));
     setFormLabel("");
+    setFormNoTime(false);
     setModalOpen(true);
   };
 
   const applyTemplate = (t: Template) => {
+    setFormNoTime(false);
     setFormTime(minutesToHHMM(t.timeMin));
     setFormLabel(t.label);
   };
@@ -336,15 +457,19 @@ export function DailyPlanner({ user }: { user: User }) {
   const submitModal = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const timeMin = hhmmToMinutes(formTime);
-    if (timeMin === null) {
-      setError("שעה לא תקינה");
-      return;
-    }
     const label = formLabel.trim();
     if (!label) {
       setError("נא למלא מה עושים");
       return;
+    }
+    let timeMin: number | null = null;
+    if (!formNoTime) {
+      const t = hhmmToMinutes(formTime);
+      if (t === null) {
+        setError("שעה לא תקינה");
+        return;
+      }
+      timeMin = t;
     }
 
     const r = await fetch("/api/daily-plan", {
@@ -390,7 +515,54 @@ export function DailyPlanner({ user }: { user: User }) {
     await loadItems();
   };
 
-  const sorted = useMemo(() => [...items].sort((a, b) => a.timeMin - b.timeMin || a.createdAt.localeCompare(b.createdAt)), [items]);
+  const commitReorder = useCallback(
+    async (newOrder: string[]) => {
+      setError(null);
+      const r = await fetch("/api/daily-plan/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateYmd, orderedIds: newOrder }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((data as { error?: string }).error ?? "שמירת סדר נכשלה");
+        return;
+      }
+      await loadItems();
+    },
+    [dateYmd, loadItems],
+  );
+
+  const handleDropOnRow = useCallback(
+    async (draggedId: string, targetId: string) => {
+      const dragged = items.find((i) => i.id === draggedId);
+      if (!dragged || dragged.timeMin !== null) return;
+      const order = items.map((i) => i.id);
+      const from = order.indexOf(draggedId);
+      const to = order.indexOf(targetId);
+      if (from < 0 || to < 0 || from === to) return;
+      const next = [...order];
+      const [x] = next.splice(from, 1);
+      next.splice(to, 0, x);
+      await commitReorder(next);
+    },
+    [items, commitReorder],
+  );
+
+  const handleDropAtEnd = useCallback(
+    async (draggedId: string) => {
+      const dragged = items.find((i) => i.id === draggedId);
+      if (!dragged || dragged.timeMin !== null) return;
+      const order = items.map((i) => i.id);
+      const from = order.indexOf(draggedId);
+      if (from < 0) return;
+      const next = [...order];
+      const [x] = next.splice(from, 1);
+      next.push(x);
+      await commitReorder(next);
+    },
+    [items, commitReorder],
+  );
 
   const btnPrimary =
     "inline-flex min-h-9 min-w-[40px] touch-manipulation items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700";
@@ -490,13 +662,13 @@ export function DailyPlanner({ user }: { user: User }) {
 
         {loading ? (
           <p className="py-4 text-center text-xs text-zinc-500">טוען…</p>
-        ) : sorted.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/80 px-2.5 py-4 text-center text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
             אין עדיין שורות ליום הזה. הוסיפו פעילות עם הכפתור למטה.
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
-            {sorted.map((it) => (
+            {items.map((it) => (
               <InlinePlanRow
                 key={it.id}
                 item={it}
@@ -504,8 +676,27 @@ export function DailyPlanner({ user }: { user: User }) {
                 setError={setError}
                 onToggleDone={() => void toggleDone(it)}
                 onRemove={() => void removeItem(it)}
+                onDropOnRow={handleDropOnRow}
+                draggingId={draggingId}
+                setDraggingId={setDraggingId}
               />
             ))}
+            {items.length > 0 && (
+              <li
+                className="h-2 min-h-2 list-none"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const draggedId = e.dataTransfer.getData("text/plain");
+                  if (!draggedId) return;
+                  void handleDropAtEnd(draggedId);
+                }}
+                aria-hidden
+              />
+            )}
           </ul>
         )}
 
@@ -529,14 +720,23 @@ export function DailyPlanner({ user }: { user: User }) {
             </div>
 
             <form onSubmit={submitModal} className="flex flex-col gap-2.5">
-              <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={formNoTime}
+                  onChange={(e) => setFormNoTime(e.target.checked)}
+                  className="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>ללא שעה (אפשר לגרור את השורה בין השאר)</span>
+              </label>
+              <label className={`flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300 ${formNoTime ? "opacity-50" : ""}`}>
                 <span>שעה</span>
                 <input
                   type="time"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
-                  required
-                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm font-medium tabular-nums tracking-tight text-indigo-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-indigo-200"
+                  disabled={formNoTime}
+                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm font-medium tabular-nums tracking-tight text-indigo-800 disabled:cursor-not-allowed dark:border-zinc-600 dark:bg-zinc-900 dark:text-indigo-200"
                 />
               </label>
 

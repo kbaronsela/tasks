@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
+import { compactDayPositions, moveItemToEndNoTime, repositionItemWithTime } from "@/lib/daily-plan-position";
 
 function jsonItem(row: {
   id: string;
   day: Date;
-  timeMin: number;
+  timeMin: number | null;
   label: string;
   done: boolean;
   createdAt: Date;
@@ -33,7 +34,7 @@ export async function PATCH(
   const { id } = await ctx.params;
 
   let body: {
-    timeMin?: number;
+    timeMin?: number | null;
     label?: string;
     done?: boolean;
   };
@@ -50,44 +51,53 @@ export async function PATCH(
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
+  const hasTime = body.timeMin !== undefined;
+  const hasLabel = body.label !== undefined;
+  const hasDone = body.done !== undefined;
+  if (!hasTime && !hasLabel && !hasDone) {
+    return NextResponse.json({ error: "אין שדות לעדכון" }, { status: 400 });
+  }
+
+  if (hasTime) {
+    if (body.timeMin === null) {
+      await moveItemToEndNoTime(session.userId, id);
+    } else {
+      const t = Number(body.timeMin);
+      if (!Number.isInteger(t) || t < 0 || t > 1439) {
+        return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
+      }
+      await repositionItemWithTime(session.userId, id, t);
+    }
+  }
+
   const data: {
-    timeMin?: number;
     label?: string;
     note?: null;
     done?: boolean;
   } = {};
 
-  if (body.timeMin !== undefined) {
-    const t = Number(body.timeMin);
-    if (!Number.isInteger(t) || t < 0 || t > 1439) {
-      return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
-    }
-    data.timeMin = t;
-  }
-
-  if (body.label !== undefined) {
+  if (hasLabel) {
     const label = String(body.label).trim();
     if (!label) {
       return NextResponse.json({ error: "תיאור ריק" }, { status: 400 });
     }
     data.label = label.slice(0, 500);
-  }
-
-  if (body.done !== undefined) {
-    data.done = Boolean(body.done);
-  }
-
-  if (body.timeMin !== undefined || body.label !== undefined) {
     data.note = null;
   }
 
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "אין שדות לעדכון" }, { status: 400 });
+  if (hasDone) {
+    data.done = Boolean(body.done);
   }
 
-  const row = await prisma.dailyPlanItem.update({
-    where: { id },
-    data,
+  if (Object.keys(data).length > 0) {
+    await prisma.dailyPlanItem.update({
+      where: { id },
+      data,
+    });
+  }
+
+  const row = await prisma.dailyPlanItem.findFirstOrThrow({
+    where: { id, userId: session.userId },
   });
 
   return NextResponse.json({ item: jsonItem(row) });
@@ -109,6 +119,10 @@ export async function DELETE(
     return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
   }
 
-  await prisma.dailyPlanItem.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.dailyPlanItem.delete({ where: { id } });
+    await compactDayPositions(tx, session.userId, existing.day);
+  });
+
   return NextResponse.json({ ok: true });
 }
