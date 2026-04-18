@@ -11,12 +11,11 @@ type PlanItem = {
   date: string;
   timeMin: number;
   label: string;
-  note: string | null;
   done: boolean;
   createdAt: string;
 };
 
-type Template = { label: string; note: string | null; timeMin: number };
+type Template = { label: string; timeMin: number };
 
 function todayYmd(): string {
   const d = new Date();
@@ -62,14 +61,12 @@ type InlinePlanRowProps = {
 function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: InlinePlanRowProps) {
   const [time, setTime] = useState(() => minutesToHHMM(item.timeMin));
   const [label, setLabel] = useState(item.label);
-  const [note, setNote] = useState(item.note ?? "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setTime(minutesToHHMM(item.timeMin));
     setLabel(item.label);
-    setNote(item.note ?? "");
-  }, [item.id, item.timeMin, item.label, item.note]);
+  }, [item.id, item.timeMin, item.label]);
 
   const save = useCallback(async () => {
     const timeMin = hhmmToMinutes(time);
@@ -84,8 +81,7 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
       setLabel(item.label);
       return;
     }
-    const noteT = note.trim() || null;
-    if (timeMin === item.timeMin && labelT === item.label && noteT === item.note) {
+    if (timeMin === item.timeMin && labelT === item.label) {
       return;
     }
     setSaving(true);
@@ -94,21 +90,20 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
       const r = await fetch(`/api/daily-plan/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeMin, label: labelT, note: noteT }),
+        body: JSON.stringify({ timeMin, label: labelT }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         setError((data as { error?: string }).error ?? "שמירה נכשלה");
         setTime(minutesToHHMM(item.timeMin));
         setLabel(item.label);
-        setNote(item.note ?? "");
         return;
       }
       await loadItems();
     } finally {
       setSaving(false);
     }
-  }, [item, time, label, note, loadItems, setError]);
+  }, [item, time, label, loadItems, setError]);
 
   const rowBorder = item.done
     ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
@@ -118,12 +113,12 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
     "rounded border border-transparent bg-transparent px-1 py-0.5 text-inherit outline-none transition-colors focus:border-indigo-400 focus:bg-white/90 dark:focus:bg-zinc-900/90";
 
   return (
-    <li className={`flex items-start gap-1.5 rounded-lg border px-2 py-1.5 ${rowBorder}`}>
+    <li className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 ${rowBorder}`}>
       <button
         type="button"
         onClick={onToggleDone}
         disabled={saving}
-        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded border-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+        className={`flex size-6 shrink-0 items-center justify-center rounded border text-[10px] font-bold leading-none transition-colors disabled:opacity-50 ${
           item.done
             ? "border-emerald-600 bg-emerald-600 text-white"
             : "border-zinc-300 bg-white text-transparent hover:border-indigo-400 dark:border-zinc-600 dark:bg-zinc-900"
@@ -154,23 +149,12 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
             }}
             disabled={saving}
             maxLength={500}
-            className={`${fieldBase} min-h-8 min-w-0 flex-1 text-right text-sm font-medium ${
+            className={`${fieldBase} min-h-7 min-w-0 flex-1 text-right text-sm font-medium ${
               item.done ? "text-zinc-500 line-through" : "text-zinc-900 dark:text-zinc-100"
             }`}
             aria-label="מה עושים"
           />
         </div>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => void save()}
-          disabled={saving}
-          maxLength={2000}
-          rows={2}
-          placeholder="הערה…"
-          className={`${fieldBase} mt-0.5 w-full resize-y text-right text-xs text-zinc-600 placeholder:text-zinc-400 dark:text-zinc-400 dark:placeholder:text-zinc-500`}
-          aria-label="הערה"
-        />
       </div>
       <button
         type="button"
@@ -217,7 +201,6 @@ export function DailyPlanner({ user }: { user: User }) {
   const [templateIndex, setTemplateIndex] = useState("");
   const [formTime, setFormTime] = useState("09:00");
   const [formLabel, setFormLabel] = useState("");
-  const [formNote, setFormNote] = useState("");
 
   const loadItems = useCallback(async () => {
     const r = await fetch(`/api/daily-plan?date=${encodeURIComponent(dateYmd)}`);
@@ -261,7 +244,6 @@ export function DailyPlanner({ user }: { user: User }) {
     setTemplateIndex("");
     setFormTime(minutesToHHMM(9 * 60));
     setFormLabel("");
-    setFormNote("");
     setModalOpen(true);
   };
 
@@ -273,7 +255,6 @@ export function DailyPlanner({ user }: { user: User }) {
     if (t) {
       setFormTime(minutesToHHMM(t.timeMin));
       setFormLabel(t.label);
-      setFormNote(t.note ?? "");
     }
   };
 
@@ -296,12 +277,11 @@ export function DailyPlanner({ user }: { user: User }) {
       setError("נא למלא מה עושים");
       return;
     }
-    const note = formNote.trim() || null;
 
     const r = await fetch("/api/daily-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: dateYmd, timeMin, label, note }),
+      body: JSON.stringify({ date: dateYmd, timeMin, label }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -515,7 +495,7 @@ export function DailyPlanner({ user }: { user: User }) {
                     <option value="">— בחר —</option>
                     {templates.map((t, i) => (
                       <option key={`${t.label}-${i}`} value={String(i)}>
-                        {minutesToHHMM(t.timeMin)} — {t.note ? `${t.label} (${t.note})` : t.label}
+                        {minutesToHHMM(t.timeMin)} — {t.label}
                       </option>
                     ))}
                   </select>
@@ -550,17 +530,6 @@ export function DailyPlanner({ user }: { user: User }) {
                   maxLength={500}
                   className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                   placeholder="למשל: ספורט, שיחה, עבודה…"
-                />
-              </label>
-
-              <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
-                <span>הערה (אופציונלי)</span>
-                <textarea
-                  value={formNote}
-                  onChange={(e) => setFormNote(e.target.value)}
-                  rows={2}
-                  maxLength={2000}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                 />
               </label>
 

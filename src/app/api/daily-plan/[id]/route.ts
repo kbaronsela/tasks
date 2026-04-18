@@ -7,7 +7,6 @@ function jsonItem(row: {
   day: Date;
   timeMin: number;
   label: string;
-  note: string | null;
   done: boolean;
   createdAt: Date;
 }) {
@@ -19,7 +18,6 @@ function jsonItem(row: {
     date: `${y}-${m}-${d}`,
     timeMin: row.timeMin,
     label: row.label,
-    note: row.note,
     done: row.done,
     createdAt: row.createdAt.toISOString(),
   };
@@ -37,7 +35,6 @@ export async function PATCH(
   let body: {
     timeMin?: number;
     label?: string;
-    note?: string | null;
     done?: boolean;
   };
   try {
@@ -56,7 +53,7 @@ export async function PATCH(
   const data: {
     timeMin?: number;
     label?: string;
-    note?: string | null;
+    note?: null;
     done?: boolean;
   } = {};
 
@@ -76,17 +73,12 @@ export async function PATCH(
     data.label = label.slice(0, 500);
   }
 
-  if (body.note !== undefined) {
-    const noteRaw = body.note;
-    data.note =
-      noteRaw === null || noteRaw === undefined
-        ? null
-        : String(noteRaw).trim() || null;
-    if (data.note) data.note = data.note.slice(0, 2000);
-  }
-
   if (body.done !== undefined) {
     data.done = Boolean(body.done);
+  }
+
+  if (body.timeMin !== undefined || body.label !== undefined) {
+    data.note = null;
   }
 
   if (Object.keys(data).length === 0) {

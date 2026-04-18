@@ -14,7 +14,6 @@ function jsonItem(row: {
   day: Date;
   timeMin: number;
   label: string;
-  note: string | null;
   done: boolean;
   createdAt: Date;
 }) {
@@ -26,7 +25,6 @@ function jsonItem(row: {
     date: `${y}-${m}-${d}`,
     timeMin: row.timeMin,
     label: row.label,
-    note: row.note,
     done: row.done,
     createdAt: row.createdAt.toISOString(),
   };
@@ -54,7 +52,7 @@ export async function POST(req: NextRequest) {
   const { session, response } = await requireUser();
   if (!session) return response!;
 
-  let body: { date?: string; timeMin?: number; label?: string; note?: string | null };
+  let body: { date?: string; timeMin?: number; label?: string };
   try {
     body = await req.json();
   } catch {
@@ -77,19 +75,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "נדרש תיאור לפעולה" }, { status: 400 });
   }
 
-  const noteRaw = body.note;
-  const note =
-    noteRaw === null || noteRaw === undefined
-      ? null
-      : String(noteRaw).trim() || null;
-
   const row = await prisma.dailyPlanItem.create({
     data: {
       userId: session.userId,
       day,
       timeMin,
       label: label.slice(0, 500),
-      note: note ? note.slice(0, 2000) : null,
+      note: null,
     },
   });
 
