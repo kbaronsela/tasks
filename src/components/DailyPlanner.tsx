@@ -136,7 +136,7 @@ function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: In
             onChange={(e) => setTime(e.target.value)}
             onBlur={() => void save()}
             disabled={saving}
-            className={`${fieldBase} w-[5.25rem] shrink-0 font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300`}
+            className={`${fieldBase} w-[5.25rem] shrink-0 text-sm font-medium tabular-nums tracking-tight text-indigo-700 dark:text-indigo-300`}
             aria-label="שעה"
           />
           <input
@@ -191,14 +191,14 @@ export function DailyPlanner({ user }: { user: User }) {
   const router = useRouter();
   const [dateYmd, setDateYmd] = useState(todayYmd);
   const [items, setItems] = useState<PlanItem[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [pinnedTemplates, setPinnedTemplates] = useState<Template[]>([]);
+  const [suggestionTemplates, setSuggestionTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [fromPast, setFromPast] = useState(false);
-  const [templateIndex, setTemplateIndex] = useState("");
   const [formTime, setFormTime] = useState("09:00");
   const [formLabel, setFormLabel] = useState("");
 
@@ -210,10 +210,11 @@ export function DailyPlanner({ user }: { user: User }) {
   }, [dateYmd]);
 
   const loadTemplates = useCallback(async () => {
-    const r = await fetch("/api/daily-plan/history");
+    const r = await fetch("/api/daily-plan/templates");
     if (!r.ok) return;
     const data = await r.json();
-    setTemplates((data.templates as Template[]) ?? []);
+    setPinnedTemplates((data.pinned as Template[]) ?? []);
+    setSuggestionTemplates((data.suggestions as Template[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -241,21 +242,81 @@ export function DailyPlanner({ user }: { user: User }) {
 
   const openNew = () => {
     setFromPast(false);
-    setTemplateIndex("");
     setFormTime(minutesToHHMM(9 * 60));
     setFormLabel("");
     setModalOpen(true);
   };
 
-  const onPickTemplate = (value: string) => {
-    setTemplateIndex(value);
-    if (value === "") return;
-    const i = parseInt(value, 10);
-    const t = templates[i];
-    if (t) {
-      setFormTime(minutesToHHMM(t.timeMin));
-      setFormLabel(t.label);
+  const applyTemplate = (t: Template) => {
+    setFormTime(minutesToHHMM(t.timeMin));
+    setFormLabel(t.label);
+  };
+
+  const pinTemplate = async (t: Template) => {
+    setError(null);
+    const r = await fetch("/api/daily-plan/templates/pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: t.label, timeMin: t.timeMin }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError((data as { error?: string }).error ?? "שמירת קבוע נכשלה");
+      return;
     }
+    await loadTemplates();
+    setToast("נשמר לקבועות");
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  const unpinTemplate = async (label: string) => {
+    setError(null);
+    const r = await fetch(`/api/daily-plan/templates/pin?label=${encodeURIComponent(label)}`, {
+      method: "DELETE",
+    });
+    if (!r.ok) {
+      setError("הסרה מהקבועות נכשלה");
+      return;
+    }
+    await loadTemplates();
+  };
+
+  const hideTemplate = async (label: string) => {
+    setError(null);
+    const r = await fetch("/api/daily-plan/templates/hide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError((data as { error?: string }).error ?? "הסתרה נכשלה");
+      return;
+    }
+    await loadTemplates();
+  };
+
+  const saveFormAsPinned = async () => {
+    const timeMin = hhmmToMinutes(formTime);
+    const label = formLabel.trim();
+    if (timeMin === null || !label) {
+      setError("מלאו שעה ושם לפני שמירה לקבועות");
+      return;
+    }
+    setError(null);
+    const r = await fetch("/api/daily-plan/templates/pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label, timeMin }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError((data as { error?: string }).error ?? "שמירת קבוע נכשלה");
+      return;
+    }
+    await loadTemplates();
+    setToast("נשמר לקבועות");
+    setTimeout(() => setToast(null), 2000);
   };
 
   const logout = async () => {
@@ -462,10 +523,7 @@ export function DailyPlanner({ user }: { user: User }) {
             <div className="mb-2 flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
               <button
                 type="button"
-                onClick={() => {
-                  setFromPast(false);
-                  setTemplateIndex("");
-                }}
+                onClick={() => setFromPast(false)}
                 className={`min-h-9 flex-1 rounded-md px-2 text-xs font-medium transition-colors ${
                   !fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 }`}
@@ -484,29 +542,88 @@ export function DailyPlanner({ user }: { user: User }) {
             </div>
 
             <form onSubmit={submitModal} className="flex flex-col gap-2.5">
-              {fromPast && templates.length > 0 && (
-                <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
-                  <span>בחר מפעילות קודמות</span>
-                  <select
-                    value={templateIndex}
-                    onChange={(e) => onPickTemplate(e.target.value)}
-                    className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-                  >
-                    <option value="">— בחר —</option>
-                    {templates.map((t, i) => (
-                      <option key={`${t.label}-${i}`} value={String(i)}>
-                        {minutesToHHMM(t.timeMin)} — {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-[11px] text-zinc-500">
-                    נטענת גם השעה מהפעם האחרונה — אפשר לשנות לפני שמירה
-                  </span>
-                </label>
+              {fromPast && (pinnedTemplates.length > 0 || suggestionTemplates.length > 0) && (
+                <div className="flex flex-col gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                  <span className="font-medium text-zinc-800 dark:text-zinc-200">בחירה מהרשימה</span>
+                  <p className="text-[11px] leading-snug text-zinc-500">
+                    <strong className="font-medium text-zinc-600 dark:text-zinc-400">קבועות</strong> — פעילויות ששמרת (חוזרות).{" "}
+                    <strong className="font-medium text-zinc-600 dark:text-zinc-400">מהעבר</strong> — מה שכבר תכננת; אפשר{" "}
+                    <strong>הסתר</strong> לחד־פעמיות או <strong>קבע</strong> לחוזרות.
+                  </p>
+                  <div className="max-h-44 space-y-2 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 bg-zinc-50/80 p-2 dark:border-zinc-700 dark:bg-zinc-950/40">
+                    {pinnedTemplates.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                          קבועות
+                        </p>
+                        <ul className="flex flex-col gap-1">
+                          {pinnedTemplates.map((t) => (
+                            <li
+                              key={`p-${t.label}`}
+                              className="flex items-center gap-1 rounded-md border border-indigo-100 bg-white px-1.5 py-1 dark:border-indigo-900/50 dark:bg-zinc-900"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => applyTemplate(t)}
+                                className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
+                              >
+                                <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void unpinTemplate(t.label)}
+                                className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                              >
+                                הסר
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {suggestionTemplates.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">מהעבר</p>
+                        <ul className="flex flex-col gap-1">
+                          {suggestionTemplates.map((t) => (
+                            <li
+                              key={`s-${t.label}-${t.timeMin}`}
+                              className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-900"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => applyTemplate(t)}
+                                className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
+                              >
+                                <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void pinTemplate(t)}
+                                className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                              >
+                                קבע
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void hideTemplate(t.label)}
+                                className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                              >
+                                הסתר
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
-              {fromPast && templates.length === 0 && (
-                <p className="text-xs text-zinc-500">עדיין אין היסטוריה — הוסיפו פעילות ב&quot;חדש&quot;.</p>
+              {fromPast && pinnedTemplates.length === 0 && suggestionTemplates.length === 0 && (
+                <p className="text-xs text-zinc-500">
+                  אין עדיין הצעות. הוסיפו פעילות בלשונית &quot;חדש&quot;, או שמרו כאן שעה ושם ולחצו &quot;שמור כקבועות&quot;.
+                </p>
               )}
 
               <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
@@ -516,7 +633,7 @@ export function DailyPlanner({ user }: { user: User }) {
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
                   required
-                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm font-medium tabular-nums tracking-tight text-indigo-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-indigo-200"
                 />
               </label>
 
@@ -532,6 +649,16 @@ export function DailyPlanner({ user }: { user: User }) {
                   placeholder="למשל: ספורט, שיחה, עבודה…"
                 />
               </label>
+
+              {fromPast && (
+                <button
+                  type="button"
+                  onClick={() => void saveFormAsPinned()}
+                  className="w-full rounded-lg border border-indigo-200 bg-indigo-50/80 py-2 text-xs font-medium text-indigo-800 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-950/70"
+                >
+                  שמור שעה ושם כקבועות
+                </button>
+              )}
 
               <div className="flex flex-col gap-1.5 pt-0.5 sm:flex-row sm:justify-end">
                 <button type="button" onClick={() => setModalOpen(false)} className={btnSecondary}>

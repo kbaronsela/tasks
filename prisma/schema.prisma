@@ -21,6 +21,33 @@ model User {
   expensesCreated TopicExpense[] @relation("ExpenseCreator")
   expensesAssigned TopicExpense[] @relation("ExpenseAssignedTo")
   dailyPlanItems DailyPlanItem[]
+  dailyPlanPinnedTemplates DailyPlanPinnedTemplate[]
+  dailyPlanHiddenLabels DailyPlanHiddenLabel[]
+}
+
+/// פעילות שמורה כ«קבועה» לבחירה מהירה מתוך «מהעבר»
+model DailyPlanPinnedTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  timeMin   Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, label])
+  @@index([userId])
+}
+
+/// פעילות שהוסתרו מההצעות האוטומטיות (לא מופיעות ברשימת «מהעבר»)
+model DailyPlanHiddenLabel {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, label])
+  @@index([userId])
 }
 
 /// שורה בתכנון יומי — לפי משתמש ותאריך לוח שנה
