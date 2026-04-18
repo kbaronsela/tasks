@@ -660,11 +660,8 @@ export function DailyPlanner({ user }: { user: User }) {
                 </button>
               )}
 
-              <div className="flex flex-col gap-1.5 pt-0.5 sm:flex-row sm:justify-end">
-                <button type="button" onClick={() => setModalOpen(false)} className={btnSecondary}>
-                  ביטול
-                </button>
-                <button type="submit" className={btnPrimary}>
+              <div className="pt-0.5">
+                <button type="submit" className={`${btnPrimary} w-full`}>
                   שמירה
                 </button>
               </div>
