@@ -16,7 +16,7 @@ type PlanItem = {
   createdAt: string;
 };
 
-type Template = { label: string; note: string | null };
+type Template = { label: string; note: string | null; timeMin: number };
 
 function todayYmd(): string {
   const d = new Date();
@@ -146,6 +146,7 @@ export function DailyPlanner({ user }: { user: User }) {
     const i = parseInt(value, 10);
     const t = templates[i];
     if (t) {
+      setFormTime(minutesToHHMM(t.timeMin));
       setFormLabel(t.label);
       setFormNote(t.note ?? "");
     }
@@ -443,11 +444,13 @@ export function DailyPlanner({ user }: { user: User }) {
                     <option value="">— בחר —</option>
                     {templates.map((t, i) => (
                       <option key={`${t.label}-${i}`} value={String(i)}>
-                        {t.note ? `${t.label} (${t.note})` : t.label}
+                        {minutesToHHMM(t.timeMin)} — {t.note ? `${t.label} (${t.note})` : t.label}
                       </option>
                     ))}
                   </select>
-                  <span className="text-xs text-zinc-500">אפשר לערוך את הטקסט והשעה אחרי הבחירה</span>
+                  <span className="text-xs text-zinc-500">
+                    נטענת גם השעה מהפעם האחרונה — אפשר לשנות לפני שמירה
+                  </span>
                 </label>
               )}
 
