@@ -198,7 +198,7 @@ export function DailyPlanner({ user }: { user: User }) {
   const [toast, setToast] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [fromPast, setFromPast] = useState(false);
+  const [pickModalOpen, setPickModalOpen] = useState(false);
   const [formTime, setFormTime] = useState("09:00");
   const [formLabel, setFormLabel] = useState("");
 
@@ -236,12 +236,15 @@ export function DailyPlanner({ user }: { user: User }) {
   }, [loadItems]);
 
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!modalOpen) setPickModalOpen(false);
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!pickModalOpen) return;
     void loadTemplates();
-  }, [modalOpen, loadTemplates]);
+  }, [pickModalOpen, loadTemplates]);
 
   const openNew = () => {
-    setFromPast(false);
     setFormTime(minutesToHHMM(9 * 60));
     setFormLabel("");
     setModalOpen(true);
@@ -250,6 +253,11 @@ export function DailyPlanner({ user }: { user: User }) {
   const applyTemplate = (t: Template) => {
     setFormTime(minutesToHHMM(t.timeMin));
     setFormLabel(t.label);
+  };
+
+  const selectTemplateFromPicker = (t: Template) => {
+    applyTemplate(t);
+    setPickModalOpen(false);
   };
 
   const pinTemplate = async (t: Template) => {
@@ -520,112 +528,7 @@ export function DailyPlanner({ user }: { user: User }) {
               <h2 className="text-center text-sm font-semibold">שורה חדשה</h2>
             </div>
 
-            <div className="mb-2 flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={() => setFromPast(false)}
-                className={`min-h-9 flex-1 rounded-md px-2 text-xs font-medium transition-colors ${
-                  !fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                חדש
-              </button>
-              <button
-                type="button"
-                onClick={() => setFromPast(true)}
-                className={`min-h-9 flex-1 rounded-md px-2 text-xs font-medium transition-colors ${
-                  fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                }`}
-              >
-                מהעבר
-              </button>
-            </div>
-
             <form onSubmit={submitModal} className="flex flex-col gap-2.5">
-              {fromPast && (pinnedTemplates.length > 0 || suggestionTemplates.length > 0) && (
-                <div className="flex flex-col gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-                  <span className="font-medium text-zinc-800 dark:text-zinc-200">בחירה מהרשימה</span>
-                  <p className="text-[11px] leading-snug text-zinc-500">
-                    <strong className="font-medium text-zinc-600 dark:text-zinc-400">קבועות</strong> — פעילויות ששמרת (חוזרות).{" "}
-                    <strong className="font-medium text-zinc-600 dark:text-zinc-400">מהעבר</strong> — מה שכבר תכננת; אפשר{" "}
-                    <strong>הסתר</strong> לחד־פעמיות או <strong>קבע</strong> לחוזרות.
-                  </p>
-                  <div className="max-h-44 space-y-2 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 bg-zinc-50/80 p-2 dark:border-zinc-700 dark:bg-zinc-950/40">
-                    {pinnedTemplates.length > 0 && (
-                      <div>
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                          קבועות
-                        </p>
-                        <ul className="flex flex-col gap-1">
-                          {pinnedTemplates.map((t) => (
-                            <li
-                              key={`p-${t.label}`}
-                              className="flex items-center gap-1 rounded-md border border-indigo-100 bg-white px-1.5 py-1 dark:border-indigo-900/50 dark:bg-zinc-900"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => applyTemplate(t)}
-                                className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
-                              >
-                                <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void unpinTemplate(t.label)}
-                                className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                              >
-                                הסר
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {suggestionTemplates.length > 0 && (
-                      <div>
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">מהעבר</p>
-                        <ul className="flex flex-col gap-1">
-                          {suggestionTemplates.map((t) => (
-                            <li
-                              key={`s-${t.label}-${t.timeMin}`}
-                              className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-900"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => applyTemplate(t)}
-                                className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
-                              >
-                                <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void pinTemplate(t)}
-                                className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                              >
-                                קבע
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void hideTemplate(t.label)}
-                                className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                              >
-                                הסתר
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {fromPast && pinnedTemplates.length === 0 && suggestionTemplates.length === 0 && (
-                <p className="text-xs text-zinc-500">
-                  אין עדיין הצעות. הוסיפו פעילות בלשונית &quot;חדש&quot;, או שמרו כאן שעה ושם ולחצו &quot;שמור כקבועות&quot;.
-                </p>
-              )}
-
               <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
                 <span>שעה</span>
                 <input
@@ -650,15 +553,21 @@ export function DailyPlanner({ user }: { user: User }) {
                 />
               </label>
 
-              {fromPast && (
-                <button
-                  type="button"
-                  onClick={() => void saveFormAsPinned()}
-                  className="w-full rounded-lg border border-indigo-200 bg-indigo-50/80 py-2 text-xs font-medium text-indigo-800 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-950/70"
-                >
-                  שמור שעה ושם כקבועות
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setPickModalOpen(true)}
+                className={`${btnSecondary} w-full`}
+              >
+                בחירה
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void saveFormAsPinned()}
+                className="w-full rounded-lg border border-indigo-200 bg-indigo-50/80 py-2 text-xs font-medium text-indigo-800 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-950/70"
+              >
+                שמירה כפעילות קבועה
+              </button>
 
               <div className="pt-0.5">
                 <button type="submit" className={`${btnPrimary} w-full`}>
@@ -666,6 +575,100 @@ export function DailyPlanner({ user }: { user: User }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {pickModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex min-h-dvh min-h-[100svh] items-end justify-center overflow-y-auto overscroll-contain bg-black/50 p-2 sm:items-center sm:p-3"
+          role="presentation"
+          onClick={(e) => e.target === e.currentTarget && setPickModalOpen(false)}
+        >
+          <div
+            className="relative my-auto w-full max-w-md rounded-t-xl bg-white p-3 shadow-xl sm:rounded-xl sm:p-4 dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative mb-2 flex min-h-8 items-center justify-center">
+              <ModalCloseButton onClick={() => setPickModalOpen(false)} />
+              <h2 className="text-center text-sm font-semibold">בחירה מהעבר</h2>
+            </div>
+            <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+              <strong className="font-medium text-zinc-600 dark:text-zinc-400">קבועות</strong> — חוזרות;{" "}
+              <strong className="font-medium text-zinc-600 dark:text-zinc-400">מהעבר</strong> — מתכנון קודם.{" "}
+              <strong>קבע</strong> / <strong>הסתר</strong> / <strong>הסר</strong> לניהול הרשימה.
+            </p>
+            {pinnedTemplates.length === 0 && suggestionTemplates.length === 0 ? (
+              <p className="py-4 text-center text-xs text-zinc-500">אין עדיין פעילויות ברשימה. אפשר להזין ידנית בשורה החדשה.</p>
+            ) : (
+              <div className="max-h-[min(60dvh,24rem)] space-y-2 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 bg-zinc-50/80 p-2 dark:border-zinc-700 dark:bg-zinc-950/40">
+                {pinnedTemplates.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                      קבועות
+                    </p>
+                    <ul className="flex flex-col gap-1">
+                      {pinnedTemplates.map((t) => (
+                        <li
+                          key={`p-${t.label}`}
+                          className="flex items-center gap-1 rounded-md border border-indigo-100 bg-white px-1.5 py-1 dark:border-indigo-900/50 dark:bg-zinc-900"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => selectTemplateFromPicker(t)}
+                            className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
+                          >
+                            <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void unpinTemplate(t.label)}
+                            className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                          >
+                            הסר
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {suggestionTemplates.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">מהעבר</p>
+                    <ul className="flex flex-col gap-1">
+                      {suggestionTemplates.map((t) => (
+                        <li
+                          key={`s-${t.label}-${t.timeMin}`}
+                          className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-1.5 py-1 dark:border-zinc-600 dark:bg-zinc-900"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => selectTemplateFromPicker(t)}
+                            className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
+                          >
+                            <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void pinTemplate(t)}
+                            className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                          >
+                            קבע
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void hideTemplate(t.label)}
+                            className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          >
+                            הסתר
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
