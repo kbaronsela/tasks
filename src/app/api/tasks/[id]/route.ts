@@ -60,6 +60,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (userIds.length === 0) {
       return NextResponse.json({ error: "נדרש לפחות משתמש משויך אחד" }, { status: 400 });
     }
+    const effectiveTopicId =
+      body.topicId !== undefined ? body.topicId : existing.topicId;
+    if (effectiveTopicId) {
+      const members = await prisma.topicUser.findMany({
+        where: { topicId: effectiveTopicId },
+        select: { userId: true },
+      });
+      const allowed = new Set(members.map((m) => m.userId));
+      for (const uid of userIds) {
+        if (!allowed.has(uid)) {
+          return NextResponse.json({ error: "ניתן לשייך רק משתמשים המשויכים לנושא" }, { status: 400 });
+        }
+      }
+    }
     await prisma.$transaction([
       prisma.taskUser.deleteMany({ where: { taskId: id } }),
       prisma.taskUser.createMany({

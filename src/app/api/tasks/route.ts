@@ -221,6 +221,19 @@ export async function POST(req: NextRequest) {
   const userIds = Array.isArray(body.userIds) ? [...new Set(body.userIds.filter(Boolean))] : [];
   if (!userIds.includes(session.userId)) userIds.push(session.userId);
 
+  if (topicId) {
+    const members = await prisma.topicUser.findMany({
+      where: { topicId },
+      select: { userId: true },
+    });
+    const allowed = new Set(members.map((m) => m.userId));
+    for (const uid of userIds) {
+      if (!allowed.has(uid)) {
+        return NextResponse.json({ error: "ניתן לשייך רק משתמשים המשויכים לנושא" }, { status: 400 });
+      }
+    }
+  }
+
   const scheduledAt = parseDate(body.scheduledAt ?? undefined);
   const dueAt = parseDate(body.dueAt ?? undefined);
 

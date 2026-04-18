@@ -65,6 +65,14 @@ function formatHeDate(iso: string | null): string {
   });
 }
 
+/** מציגים שורת «משויכים» בכרטיס רק כשיש יותר ממשתמש אחד במטלה, וכשאין נושא עם חבר יחיד */
+function shouldShowTaskAssigneesOnCard(t: TaskItem, topics: Topic[]): boolean {
+  const topicMembers = t.topic
+    ? topics.find((x) => x.id === t.topic!.id)?.users.length ?? 0
+    : 0;
+  return t.users.length > 1 && (topicMembers === 0 || topicMembers > 1);
+}
+
 function ModalCloseButton({
   onClick,
   align = "center",
@@ -610,6 +618,49 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     return tasks.filter((x) => x.id !== editTaskId);
   }, [tasks, editTaskId]);
 
+  /** משתמשים שאפשר לשייך למטלה — כשיש נושא: רק חברי הנושא; בלי נושא: כל המשתמשים */
+  const taskModalAssignableUsers = useMemo((): User[] => {
+    const tid = taskTopicId.trim();
+    if (!tid) {
+      return allUsers;
+    }
+    const topic = topics.find((t) => t.id === tid);
+    return topic?.users ?? [];
+  }, [taskTopicId, topics, allUsers]);
+
+  const showTaskAssigneesInModal = taskModalAssignableUsers.length > 1;
+
+  useEffect(() => {
+    if (!taskModal) return;
+    const tid = taskTopicId.trim();
+    let list: User[];
+    if (tid) {
+      const topic = topics.find((t) => t.id === tid);
+      if (!topic) return;
+      list = topic.users;
+    } else {
+      list = allUsers;
+      if (list.length === 0) return;
+    }
+    if (list.length === 0) {
+      setTaskUserIds([user.id]);
+      return;
+    }
+    if (list.length === 1) {
+      setTaskUserIds([list[0].id]);
+      return;
+    }
+    setTaskUserIds((prev) => {
+      const allowed = new Set(list.map((u) => u.id));
+      const filtered = prev.filter((id) => allowed.has(id));
+      if (filtered.length === 0) {
+        if (allowed.has(user.id)) return [user.id];
+        return [list[0].id];
+      }
+      return filtered;
+    });
+  }, [taskModal, taskTopicId, topics, allUsers, user.id]);
+
   const openFilterModal = useCallback(() => {
     setDraftDateFrom(dateFilterFrom);
     setDraftDateTo(dateFilterTo);
@@ -1087,9 +1138,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                         )}
                       </div>
                     )}
-                    <div className="mt-2 break-words text-xs text-zinc-500">
-                      משויכים: {t.users.map((u) => u.name).join(", ")}
-                    </div>
+                    {shouldShowTaskAssigneesOnCard(t, topics) && (
+                      <div className="mt-2 break-words text-xs text-zinc-500">
+                        משויכים: {t.users.map((u) => u.name).join(", ")}
+                      </div>
+                    )}
                     {assignedToMe && (
                       <div className="mt-3 flex flex-wrap gap-1 sm:gap-2">
                         <button
@@ -1518,27 +1571,29 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                 />
               </label>
-              <div>
-                <p className="mb-1 text-sm text-zinc-600">משויכים למטלה</p>
-                <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
-                  {allUsers.map((u) => (
-                    <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
-                      <input
-                        type="checkbox"
-                        checked={taskUserIds.includes(u.id)}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          setTaskUserIds((prev) =>
-                            on ? (prev.includes(u.id) ? prev : [...prev, u.id]) : prev.filter((x) => x !== u.id)
-                          );
-                        }}
-                        className="size-5 shrink-0"
-                      />
-                      <span className="min-w-0 break-words">{u.name}</span>
-                    </label>
-                  ))}
+              {showTaskAssigneesInModal && (
+                <div>
+                  <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">משויכים למטלה</p>
+                  <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                    {taskModalAssignableUsers.map((u) => (
+                      <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
+                        <input
+                          type="checkbox"
+                          checked={taskUserIds.includes(u.id)}
+                          onChange={(e) => {
+                            const on = e.target.checked;
+                            setTaskUserIds((prev) =>
+                              on ? (prev.includes(u.id) ? prev : [...prev, u.id]) : prev.filter((x) => x !== u.id)
+                            );
+                          }}
+                          className="size-5 shrink-0"
+                        />
+                        <span className="min-w-0 break-words">{u.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">
                   תלויות (יש להשלים לפני המטלה הנוכחית)
