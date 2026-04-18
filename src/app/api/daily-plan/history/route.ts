@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/api-auth";
 
-/** תבניות מפעילויות קודמות — לפי ייחודיות label+note, מהחדש לישן */
+/** תבניות מפעילויות קודמות — ייחודיות label+note (השעה מהמופע האחרון), ממוינות לפי שעה */
 export async function GET() {
   const { session, response } = await requireUser();
   if (!session) return response!;
@@ -23,6 +23,11 @@ export async function GET() {
     templates.push({ label: r.label, note: r.note, timeMin: r.timeMin });
     if (templates.length >= 60) break;
   }
+
+  templates.sort((a, b) => {
+    if (a.timeMin !== b.timeMin) return a.timeMin - b.timeMin;
+    return a.label.localeCompare(b.label, "he");
+  });
 
   return NextResponse.json({ templates });
 }
