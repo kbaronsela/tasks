@@ -51,12 +51,149 @@ function shiftYmd(ymd: string, deltaDays: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+type InlinePlanRowProps = {
+  item: PlanItem;
+  loadItems: () => Promise<void>;
+  setError: (msg: string | null) => void;
+  onToggleDone: () => void;
+  onRemove: () => void;
+};
+
+function InlinePlanRow({ item, loadItems, setError, onToggleDone, onRemove }: InlinePlanRowProps) {
+  const [time, setTime] = useState(() => minutesToHHMM(item.timeMin));
+  const [label, setLabel] = useState(item.label);
+  const [note, setNote] = useState(item.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTime(minutesToHHMM(item.timeMin));
+    setLabel(item.label);
+    setNote(item.note ?? "");
+  }, [item.id, item.timeMin, item.label, item.note]);
+
+  const save = useCallback(async () => {
+    const timeMin = hhmmToMinutes(time);
+    if (timeMin === null) {
+      setError("שעה לא תקינה");
+      setTime(minutesToHHMM(item.timeMin));
+      return;
+    }
+    const labelT = label.trim();
+    if (!labelT) {
+      setError("נא למלא כותרת");
+      setLabel(item.label);
+      return;
+    }
+    const noteT = note.trim() || null;
+    if (timeMin === item.timeMin && labelT === item.label && noteT === item.note) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/daily-plan/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeMin, label: labelT, note: noteT }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError((data as { error?: string }).error ?? "שמירה נכשלה");
+        setTime(minutesToHHMM(item.timeMin));
+        setLabel(item.label);
+        setNote(item.note ?? "");
+        return;
+      }
+      await loadItems();
+    } finally {
+      setSaving(false);
+    }
+  }, [item, time, label, note, loadItems, setError]);
+
+  const rowBorder = item.done
+    ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+    : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900/80";
+
+  const fieldBase =
+    "rounded border border-transparent bg-transparent px-1 py-0.5 text-inherit outline-none transition-colors focus:border-indigo-400 focus:bg-white/90 dark:focus:bg-zinc-900/90";
+
+  return (
+    <li className={`flex items-start gap-1.5 rounded-lg border px-2 py-1.5 ${rowBorder}`}>
+      <button
+        type="button"
+        onClick={onToggleDone}
+        disabled={saving}
+        className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded border-2 text-xs font-bold transition-colors disabled:opacity-50 ${
+          item.done
+            ? "border-emerald-600 bg-emerald-600 text-white"
+            : "border-zinc-300 bg-white text-transparent hover:border-indigo-400 dark:border-zinc-600 dark:bg-zinc-900"
+        }`}
+        aria-pressed={item.done}
+        aria-label={item.done ? "בוצע — לחיצה לביטול" : "סמן כבוצע"}
+      >
+        {item.done ? "✓" : ""}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            onBlur={() => void save()}
+            disabled={saving}
+            className={`${fieldBase} w-[5.25rem] shrink-0 font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300`}
+            aria-label="שעה"
+          />
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onBlur={() => void save()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            disabled={saving}
+            maxLength={500}
+            className={`${fieldBase} min-h-8 min-w-0 flex-1 text-right text-sm font-medium ${
+              item.done ? "text-zinc-500 line-through" : "text-zinc-900 dark:text-zinc-100"
+            }`}
+            aria-label="מה עושים"
+          />
+        </div>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={() => void save()}
+          disabled={saving}
+          maxLength={2000}
+          rows={2}
+          placeholder="הערה…"
+          className={`${fieldBase} mt-0.5 w-full resize-y text-right text-xs text-zinc-600 placeholder:text-zinc-400 dark:text-zinc-400 dark:placeholder:text-zinc-500`}
+          aria-label="הערה"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        disabled={saving}
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded text-base leading-none text-zinc-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:text-zinc-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+        aria-label="מחק"
+      >
+        ×
+      </button>
+    </li>
+  );
+}
+
 function ModalCloseButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="absolute left-0 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+      className="absolute left-0 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
       aria-label="סגור"
     >
       <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -76,7 +213,6 @@ export function DailyPlanner({ user }: { user: User }) {
   const [toast, setToast] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
   const [fromPast, setFromPast] = useState(false);
   const [templateIndex, setTemplateIndex] = useState("");
   const [formTime, setFormTime] = useState("09:00");
@@ -121,22 +257,11 @@ export function DailyPlanner({ user }: { user: User }) {
   }, [modalOpen, loadTemplates]);
 
   const openNew = () => {
-    setEditId(null);
     setFromPast(false);
     setTemplateIndex("");
     setFormTime(minutesToHHMM(9 * 60));
     setFormLabel("");
     setFormNote("");
-    setModalOpen(true);
-  };
-
-  const openEdit = (it: PlanItem) => {
-    setEditId(it.id);
-    setFromPast(false);
-    setTemplateIndex("");
-    setFormTime(minutesToHHMM(it.timeMin));
-    setFormLabel(it.label);
-    setFormNote(it.note ?? "");
     setModalOpen(true);
   };
 
@@ -173,28 +298,15 @@ export function DailyPlanner({ user }: { user: User }) {
     }
     const note = formNote.trim() || null;
 
-    if (editId) {
-      const r = await fetch(`/api/daily-plan/${editId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timeMin, label, note }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setError((data as { error?: string }).error ?? "שמירה נכשלה");
-        return;
-      }
-    } else {
-      const r = await fetch("/api/daily-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateYmd, timeMin, label, note }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setError((data as { error?: string }).error ?? "שמירה נכשלה");
-        return;
-      }
+    const r = await fetch("/api/daily-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: dateYmd, timeMin, label, note }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError((data as { error?: string }).error ?? "שמירה נכשלה");
+      return;
     }
 
     setModalOpen(false);
@@ -232,11 +344,11 @@ export function DailyPlanner({ user }: { user: User }) {
   const sorted = useMemo(() => [...items].sort((a, b) => a.timeMin - b.timeMin || a.createdAt.localeCompare(b.createdAt)), [items]);
 
   const btnPrimary =
-    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700";
+    "inline-flex min-h-9 min-w-[40px] touch-manipulation items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700";
   const btnSecondary =
-    "inline-flex min-h-11 min-w-[44px] touch-manipulation items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800";
+    "inline-flex min-h-9 min-w-[40px] touch-manipulation items-center justify-center rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-indigo-900 dark:bg-zinc-900 dark:text-indigo-300 dark:hover:bg-zinc-800";
   const sidebarNavBtn =
-    "w-full rounded-xl px-3 py-2.5 text-right text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200/80 active:bg-zinc-300/80 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700";
+    "w-full rounded-lg px-2.5 py-2 text-right text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200/80 active:bg-zinc-300/80 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700";
 
   const dateTitle = useMemo(() => {
     const [y, m, d] = dateYmd.split("-").map(Number);
@@ -251,10 +363,10 @@ export function DailyPlanner({ user }: { user: User }) {
   return (
     <div className="flex min-h-dvh w-full flex-col lg:flex-row">
       <aside
-        className="hidden shrink-0 border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:flex-col lg:overflow-y-auto lg:border-e"
+        className="hidden shrink-0 border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-52 lg:flex-col lg:overflow-y-auto lg:border-e"
         aria-label="תפריט צד"
       >
-        <nav className="flex flex-col gap-1 p-4 pt-6">
+        <nav className="flex flex-col gap-0.5 p-3 pt-4">
           <Link href="/dashboard" className={sidebarNavBtn}>
             ניהול דברים
           </Link>
@@ -264,17 +376,17 @@ export function DailyPlanner({ user }: { user: User }) {
         </nav>
       </aside>
 
-      <div className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-5 sm:py-8 lg:max-w-2xl lg:px-6">
-        <header className="border-b border-zinc-200 pb-4 dark:border-zinc-800 sm:pb-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 ps-[4.75rem] lg:ps-0">
-              <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">תכנון יומי</h1>
-              <p className="mt-1 text-sm text-zinc-500 sm:text-base">שלום, {user.name}</p>
+      <div className="mx-auto flex w-full min-w-0 max-w-lg flex-1 flex-col gap-2 px-2 py-2 sm:gap-2.5 sm:px-4 sm:py-3 lg:max-w-2xl lg:px-4">
+        <header className="border-b border-zinc-200 pb-2 dark:border-zinc-800">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 ps-[3.5rem] lg:ps-0">
+              <h1 className="text-lg font-bold leading-tight text-zinc-900 sm:text-xl dark:text-white">תכנון יומי</h1>
+              <p className="text-xs text-zinc-500 sm:text-sm">שלום, {user.name}</p>
             </div>
-            <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] z-40 flex gap-2 lg:hidden">
+            <div className="fixed top-[max(0.5rem,env(safe-area-inset-top))] right-[max(0.5rem,env(safe-area-inset-right))] z-40 flex gap-1.5 lg:hidden">
               <Link
                 href="/dashboard"
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-indigo-700 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-indigo-300"
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-indigo-700 shadow-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-indigo-300"
               >
                 ניהול
               </Link>
@@ -283,111 +395,72 @@ export function DailyPlanner({ user }: { user: User }) {
         </header>
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </div>
         )}
         {toast && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100">
             {toast}
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setDateYmd((d) => shiftYmd(d, -1))}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
               aria-label="יום קודם"
             >
               ‹
             </button>
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+            <label className="flex min-w-0 flex-1 flex-col">
               <span className="sr-only">תאריך</span>
               <input
                 type="date"
                 value={dateYmd}
                 onChange={(e) => setDateYmd(e.target.value)}
-                className="min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
               />
             </label>
             <button
               type="button"
               onClick={() => setDateYmd((d) => shiftYmd(d, 1))}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-sm text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
               aria-label="יום הבא"
             >
               ›
             </button>
-            <button
-              type="button"
-              onClick={() => setDateYmd(todayYmd())}
-              className={btnSecondary}
-            >
+            <button type="button" onClick={() => setDateYmd(todayYmd())} className={btnSecondary}>
               היום
             </button>
           </div>
-          <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">{dateTitle}</p>
+          <p className="text-center text-xs text-zinc-600 dark:text-zinc-400">{dateTitle}</p>
         </div>
 
         {loading ? (
-          <p className="py-8 text-center text-zinc-500">טוען…</p>
+          <p className="py-4 text-center text-xs text-zinc-500">טוען…</p>
         ) : sorted.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 px-4 py-8 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
+          <p className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50/80 px-2.5 py-4 text-center text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
             אין עדיין שורות ליום הזה. הוסיפו פעילות עם הכפתור למטה.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-1">
             {sorted.map((it) => (
-              <li
+              <InlinePlanRow
                 key={it.id}
-                className={`flex flex-wrap items-start gap-3 rounded-xl border px-3 py-3 sm:px-4 ${
-                  it.done
-                    ? "border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-                    : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900/80"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => void toggleDone(it)}
-                  className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold transition-colors ${
-                    it.done
-                      ? "border-emerald-600 bg-emerald-600 text-white"
-                      : "border-zinc-300 bg-white text-transparent hover:border-indigo-400 dark:border-zinc-600 dark:bg-zinc-900"
-                  }`}
-                  aria-pressed={it.done}
-                  aria-label={it.done ? "בוצע — לחיצה לביטול" : "סמן כבוצע"}
-                >
-                  {it.done ? "✓" : ""}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                    <span className="font-mono text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                      {minutesToHHMM(it.timeMin)}
-                    </span>
-                    <span className={`text-base font-medium ${it.done ? "text-zinc-500 line-through" : "text-zinc-900 dark:text-zinc-100"}`}>
-                      {it.label}
-                    </span>
-                  </div>
-                  {it.note ? (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{it.note}</p>
-                  ) : null}
-                </div>
-                <div className="flex w-full shrink-0 justify-end gap-2 sm:w-auto sm:flex-col sm:items-end">
-                  <button type="button" onClick={() => openEdit(it)} className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                    ערוך
-                  </button>
-                  <button type="button" onClick={() => void removeItem(it)} className="text-sm text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400">
-                    מחק
-                  </button>
-                </div>
-              </li>
+                item={it}
+                loadItems={loadItems}
+                setError={setError}
+                onToggleDone={() => void toggleDone(it)}
+                onRemove={() => void removeItem(it)}
+              />
             ))}
           </ul>
         )}
 
-        <div className="pb-8">
+        <div className="pb-3 pt-0.5">
           <button type="button" onClick={openNew} className={`${btnPrimary} w-full`}>
             הוספת שורה
           </button>
@@ -396,50 +469,48 @@ export function DailyPlanner({ user }: { user: User }) {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[52] flex min-h-dvh min-h-[100svh] items-end justify-center overflow-y-auto overscroll-contain bg-black/40 p-3 sm:items-center sm:p-4"
+          className="fixed inset-0 z-[52] flex min-h-dvh min-h-[100svh] items-end justify-center overflow-y-auto overscroll-contain bg-black/40 p-2 sm:items-center sm:p-3"
           role="presentation"
           onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}
         >
-          <div className="relative my-auto w-full max-w-md rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6 dark:bg-zinc-900">
-            <div className="relative mb-4 flex min-h-9 items-center justify-center">
+          <div className="relative my-auto w-full max-w-md rounded-t-xl bg-white p-3 shadow-xl sm:rounded-xl sm:p-4 dark:bg-zinc-900">
+            <div className="relative mb-2 flex min-h-8 items-center justify-center">
               <ModalCloseButton onClick={() => setModalOpen(false)} />
-              <h2 className="text-center text-base font-semibold sm:text-lg">{editId ? "עריכת שורה" : "שורה חדשה"}</h2>
+              <h2 className="text-center text-sm font-semibold">שורה חדשה</h2>
             </div>
 
-            {!editId && (
-              <div className="mb-4 flex rounded-xl border border-zinc-200 p-1 dark:border-zinc-700">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFromPast(false);
-                    setTemplateIndex("");
-                  }}
-                  className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-medium transition-colors ${
-                    !fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  חדש
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFromPast(true)}
-                  className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-medium transition-colors ${
-                    fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  מהעבר
-                </button>
-              </div>
-            )}
+            <div className="mb-2 flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setFromPast(false);
+                  setTemplateIndex("");
+                }}
+                className={`min-h-9 flex-1 rounded-md px-2 text-xs font-medium transition-colors ${
+                  !fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+              >
+                חדש
+              </button>
+              <button
+                type="button"
+                onClick={() => setFromPast(true)}
+                className={`min-h-9 flex-1 rounded-md px-2 text-xs font-medium transition-colors ${
+                  fromPast ? "bg-indigo-600 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                }`}
+              >
+                מהעבר
+              </button>
+            </div>
 
-            <form onSubmit={submitModal} className="flex flex-col gap-4">
-              {!editId && fromPast && templates.length > 0 && (
-                <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+            <form onSubmit={submitModal} className="flex flex-col gap-2.5">
+              {fromPast && templates.length > 0 && (
+                <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
                   <span>בחר מפעילות קודמות</span>
                   <select
                     value={templateIndex}
                     onChange={(e) => onPickTemplate(e.target.value)}
-                    className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                    className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                   >
                     <option value="">— בחר —</option>
                     {templates.map((t, i) => (
@@ -448,28 +519,28 @@ export function DailyPlanner({ user }: { user: User }) {
                       </option>
                     ))}
                   </select>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-[11px] text-zinc-500">
                     נטענת גם השעה מהפעם האחרונה — אפשר לשנות לפני שמירה
                   </span>
                 </label>
               )}
 
-              {!editId && fromPast && templates.length === 0 && (
-                <p className="text-sm text-zinc-500">עדיין אין היסטוריה — הוסיפו פעילות ב&quot;חדש&quot;.</p>
+              {fromPast && templates.length === 0 && (
+                <p className="text-xs text-zinc-500">עדיין אין היסטוריה — הוסיפו פעילות ב&quot;חדש&quot;.</p>
               )}
 
-              <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+              <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
                 <span>שעה</span>
                 <input
                   type="time"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
                   required
-                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                 />
               </label>
 
-              <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+              <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
                 <span>מה עושים</span>
                 <input
                   type="text"
@@ -477,23 +548,23 @@ export function DailyPlanner({ user }: { user: User }) {
                   onChange={(e) => setFormLabel(e.target.value)}
                   required
                   maxLength={500}
-                  className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                  className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                   placeholder="למשל: ספורט, שיחה, עבודה…"
                 />
               </label>
 
-              <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+              <label className="flex flex-col gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
                 <span>הערה (אופציונלי)</span>
                 <textarea
                   value={formNote}
                   onChange={(e) => setFormNote(e.target.value)}
                   rows={2}
                   maxLength={2000}
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
                 />
               </label>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <div className="flex flex-col gap-1.5 pt-0.5 sm:flex-row sm:justify-end">
                 <button type="button" onClick={() => setModalOpen(false)} className={btnSecondary}>
                   ביטול
                 </button>
