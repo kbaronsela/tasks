@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
 
-/** אינדקס הכנסה לשורה עם שעה — לפני שעה גבוהה יותר או לפני בלוק ללא שעה */
+/**
+ * אינדקס הכנסה לשורה עם שעה: לפני השורה המתוזמנת הראשונה עם שעה גבוהה יותר.
+ * שורות ללא שעה לא משפיעות על האינדקס — רק משווים מול timeMin שאינו null.
+ */
 export function findInsertIndexForTimed(
   rows: { id: string; timeMin: number | null }[],
   timeMin: number,
@@ -11,7 +14,6 @@ export function findInsertIndexForTimed(
   for (let i = 0; i < rows.length; i++) {
     const t = rows[i].timeMin;
     if (t != null && t > timeMin) return i;
-    if (t === null) return i;
   }
   return rows.length;
 }
@@ -60,7 +62,7 @@ export async function moveItemToEndNoTime(userId: string, itemId: string): Promi
   });
 }
 
-/** מעדכן שעה וממקם את השורה לפי סדר השעות (בלי לשנות סדר יחסי של שורות אחרות מעבר להכרח) */
+/** מעדכן שעה וממקם את השורה לפי סדר השעות (מול שורות מתוזמנות בלבד; ללא שעה לא מזיזים) */
 export async function repositionItemWithTime(
   userId: string,
   itemId: string,
