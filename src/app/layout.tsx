@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Rubik } from "next/font/google";
+import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -10,12 +11,22 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "ניהול דברים",
   description: "נושאים, מטלות, הוצאות, אנשי קשר, תאריכים ורשימות",
+  icons: {
+    icon: [{ url: "/icons/pwa-192.png", sizes: "192x192", type: "image/png" }],
+    apple: "/icons/pwa-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "ניהול דברים",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover" as const,
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({
@@ -26,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="he" dir="rtl" className={`${rubik.variable} h-full overflow-x-hidden`}>
       <body className="min-h-dvh min-h-[100svh] overflow-x-hidden bg-zinc-50 pb-[env(safe-area-inset-bottom)] font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
+        <RegisterServiceWorker />
         {children}
       </body>
     </html>
