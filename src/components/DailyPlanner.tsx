@@ -533,7 +533,7 @@ export function DailyPlanner({ user }: { user: User }) {
       >
         <nav className="flex flex-col gap-0.5 p-3 pt-4">
           <Link href="/dashboard" className={sidebarNavBtn}>
-            ניהול דברים
+            מה היום?
           </Link>
           <button type="button" className={sidebarNavBtn} onClick={() => void logout()}>
             יציאה

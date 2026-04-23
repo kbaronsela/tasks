@@ -9,15 +9,15 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
-  title: "ניהול דברים",
-  description: "נושאים, מטלות, הוצאות, אנשי קשר, תאריכים ורשימות",
+  title: "מה היום?",
+  description: "תכנון יומי, מטלות וניהול דברים",
   icons: {
     icon: [{ url: "/icons/pwa-192.png", sizes: "192x192", type: "image/png" }],
     apple: "/icons/pwa-192.png",
   },
   appleWebApp: {
     capable: true,
-    title: "ניהול דברים",
+    title: "מה היום?",
     statusBarStyle: "default",
   },
 };

@@ -37,7 +37,7 @@ export default function LoginPage() {
     <div className="flex min-h-dvh min-h-[100svh] flex-col items-center justify-center px-4 py-8 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-lg sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
         <h1 className="text-center text-xl font-bold sm:text-2xl">התחברות</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500">ניהול דברים</p>
+        <p className="mt-2 text-center text-sm text-zinc-500">מה היום?</p>
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
           {error && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-200">

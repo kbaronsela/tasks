@@ -755,7 +755,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-1 flex-col gap-4 px-3 py-4 sm:gap-6 sm:px-5 sm:py-8 lg:px-6">
         <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between sm:pb-6">
           <div className="min-w-0 ps-[4.75rem] lg:ps-0">
-            <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">ניהול דברים</h1>
+            <h1 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">מה היום?</h1>
             <p className="mt-1 truncate text-sm text-zinc-500 sm:text-base">
               שלום, {user.name}
               {focusTopicId && (

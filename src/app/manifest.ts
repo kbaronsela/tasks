@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ניהול דברים",
-    short_name: "ניהול דברים",
-    description: "נושאים, מטלות, הוצאות, אנשי קשר, תאריכים ורשימות",
+    name: "מה היום?",
+    short_name: "מה היום?",
+    description: "תכנון יומי, מטלות וניהול דברים",
     start_url: "/",
     scope: "/",
     display: "standalone",
