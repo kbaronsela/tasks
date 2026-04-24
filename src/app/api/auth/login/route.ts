@@ -19,7 +19,13 @@ export async function POST(req: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user?.passwordHash) {
+    return NextResponse.json(
+      { error: "חשבון זה מוגדר להתחברות עם גוגל — השתמשו בכפתור «המשך עם גוגל»" },
+      { status: 401 },
+    );
+  }
+  if (!(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "פרטים שגויים" }, { status: 401 });
   }
 

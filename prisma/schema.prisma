@@ -11,7 +11,8 @@ model User {
   id           String       @id @default(cuid())
   email        String       @unique
   name         String
-  passwordHash String
+  /// null = משתמש שנכנס רק דרך Google (או ספק OAuth אחר בעתיד)
+  passwordHash String?
   createdAt    DateTime     @default(now())
   topics       TopicUser[]
   tasks        TaskUser[]
