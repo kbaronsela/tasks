@@ -667,11 +667,11 @@ export function DailyPlanner({ user }: { user: User }) {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[52] flex min-h-dvh min-h-[100svh] items-end justify-center overflow-y-auto overscroll-contain bg-black/40 p-2 sm:items-center sm:p-3"
+          className="fixed inset-0 z-[52] flex min-h-dvh min-h-[100svh] items-end justify-center overflow-y-auto overscroll-contain bg-black/40 px-2 pb-24 pt-2 sm:items-center sm:px-3 sm:pb-3 sm:pt-3"
           role="presentation"
           onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}
         >
-          <div className="relative my-auto w-full max-w-md rounded-t-xl bg-white p-3 shadow-xl sm:rounded-xl sm:p-4 dark:bg-zinc-900">
+          <div className="relative my-auto w-full max-w-md -translate-y-2 rounded-t-xl bg-white p-3 shadow-xl sm:-translate-y-10 sm:rounded-xl sm:p-4 dark:bg-zinc-900">
             <div className="relative mb-2 flex min-h-8 items-center justify-center">
               <ModalCloseButton onClick={() => setModalOpen(false)} />
               <h2 className="text-center text-sm font-semibold">שורה חדשה</h2>
