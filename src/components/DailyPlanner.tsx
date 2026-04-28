@@ -15,7 +15,12 @@ type PlanItem = {
   createdAt: string;
 };
 
-type Template = { label: string; timeMin: number };
+type Template = { label: string; timeMin: number | null };
+
+function formatTemplateTimePrefix(timeMin: number | null): string {
+  if (timeMin === null) return "ללא שעה";
+  return minutesToHHMM(timeMin);
+}
 
 function todayYmd(): string {
   const d = new Date();
@@ -315,7 +320,7 @@ export function DailyPlanner({ user }: { user: User }) {
   };
 
   const applyTemplate = (t: Template) => {
-    setFormTime(minutesToHHMM(t.timeMin));
+    setFormTime(t.timeMin !== null ? minutesToHHMM(t.timeMin) : "");
     setFormLabel(t.label);
   };
 
@@ -329,7 +334,7 @@ export function DailyPlanner({ user }: { user: User }) {
     const r = await fetch("/api/daily-plan/templates/pin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: t.label, timeMin: t.timeMin }),
+      body: JSON.stringify({ label: t.label, timeMin: t.timeMin ?? null }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -369,11 +374,20 @@ export function DailyPlanner({ user }: { user: User }) {
   };
 
   const saveFormAsPinned = async () => {
-    const timeMin = hhmmToMinutes(formTime);
     const label = formLabel.trim();
-    if (timeMin === null || !label) {
-      setError("מלאו שעה ושם לפני שמירה לקבועות");
+    if (!label) {
+      setError("מלאו שם לפני שמירה לקבועות");
       return;
+    }
+    const ft = formTime.trim();
+    let timeMin: number | null = null;
+    if (ft !== "") {
+      const parsed = hhmmToMinutes(ft);
+      if (parsed === null) {
+        setError("שעה לא תקינה");
+        return;
+      }
+      timeMin = parsed;
     }
     setError(null);
     const r = await fetch("/api/daily-plan/templates/pin", {
@@ -753,7 +767,8 @@ export function DailyPlanner({ user }: { user: User }) {
                             onClick={() => selectTemplateFromPicker(t)}
                             className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
                           >
-                            <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                            <span className="tabular-nums tracking-tight">{formatTemplateTimePrefix(t.timeMin)}</span> —{" "}
+                            {t.label}
                           </button>
                           <button
                             type="button"
@@ -781,7 +796,7 @@ export function DailyPlanner({ user }: { user: User }) {
                             onClick={() => selectTemplateFromPicker(t)}
                             className="min-w-0 flex-1 truncate text-right text-xs text-zinc-800 hover:underline dark:text-zinc-100"
                           >
-                            <span className="tabular-nums tracking-tight">{minutesToHHMM(t.timeMin)}</span> — {t.label}
+                            <span className="tabular-nums tracking-tight">{formatTemplateTimePrefix(t.timeMin)}</span> — {t.label}
                           </button>
                           <button
                             type="button"

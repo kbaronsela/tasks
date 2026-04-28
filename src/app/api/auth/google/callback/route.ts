@@ -32,8 +32,7 @@ export async function GET(req: NextRequest) {
     return redirectLogin(req, "google_invalid");
   }
 
-  const origin = req.nextUrl.origin;
-  const redirectUri = getGoogleRedirectUri(origin);
+  const redirectUri = getGoogleRedirectUri(req.nextUrl.origin);
   const clientId = process.env.GOOGLE_CLIENT_ID!.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET!.trim();
 

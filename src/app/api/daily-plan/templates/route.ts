@@ -8,9 +8,17 @@ export async function GET() {
   const { session, response } = await requireUser();
   if (!session) return response!;
 
-  const pinned = await prisma.dailyPlanPinnedTemplate.findMany({
+  const pinnedRows = await prisma.dailyPlanPinnedTemplate.findMany({
     where: { userId: session.userId },
-    orderBy: [{ timeMin: "asc" }, { label: "asc" }],
+  });
+  const pinned = [...pinnedRows].sort((a, b) => {
+    if (a.timeMin != null && b.timeMin != null) {
+      if (a.timeMin !== b.timeMin) return a.timeMin - b.timeMin;
+      return a.label.localeCompare(b.label, "he");
+    }
+    if (a.timeMin != null) return -1;
+    if (b.timeMin != null) return 1;
+    return a.label.localeCompare(b.label, "he");
   });
 
   const hiddenRows = await prisma.dailyPlanHiddenLabel.findMany({

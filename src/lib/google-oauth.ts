@@ -2,8 +2,15 @@ const GOOGLE_AUTHORIZE = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo";
 
+/** מקור ציבורי לאתר: בפרודקשן עדיף NEXT_PUBLIC_APP_URL כדי ש־redirect_uri יתאים למה שרשום ב-Google Console */
+export function getPublicOrigin(requestOrigin: string): string {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  return requestOrigin.replace(/\/$/, "");
+}
+
 export function getGoogleRedirectUri(origin: string): string {
-  return `${origin.replace(/\/$/, "")}/api/auth/google/callback`;
+  return `${getPublicOrigin(origin)}/api/auth/google/callback`;
 }
 
 export function buildGoogleAuthorizeUrl(params: {

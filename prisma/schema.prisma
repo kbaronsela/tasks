@@ -32,7 +32,8 @@ model DailyPlanPinnedTemplate {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   label     String
-  timeMin   Int
+  /// null = קבועה ללא שעה (רק שם)
+  timeMin   Int?
   createdAt DateTime @default(now())
 
   @@unique([userId, label])

@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const { session, response } = await requireUser();
   if (!session) return response!;
 
-  let body: { label?: string; timeMin?: number };
+  let body: { label?: string; timeMin?: number | null };
   try {
     body = await req.json();
   } catch {
@@ -19,9 +19,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "נדרש תיאור" }, { status: 400 });
   }
 
-  const timeMin = Number(body.timeMin);
-  if (!Number.isInteger(timeMin) || timeMin < 0 || timeMin > 1439) {
-    return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
+  let timeMin: number | null = null;
+  const raw = body.timeMin;
+  if (raw !== undefined && raw !== null) {
+    const t = Number(raw);
+    if (!Number.isInteger(t) || t < 0 || t > 1439) {
+      return NextResponse.json({ error: "שעה לא תקינה" }, { status: 400 });
+    }
+    timeMin = t;
   }
 
   await prisma.dailyPlanPinnedTemplate.upsert({

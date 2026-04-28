@@ -15,8 +15,7 @@ export async function GET(req: NextRequest) {
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID!.trim();
-  const origin = req.nextUrl.origin;
-  const redirectUri = getGoogleRedirectUri(origin);
+  const redirectUri = getGoogleRedirectUri(req.nextUrl.origin);
   const state = randomState();
 
   const url = buildGoogleAuthorizeUrl({ clientId, redirectUri, state });
