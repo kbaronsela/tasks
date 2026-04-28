@@ -37,7 +37,7 @@ export async function GET() {
   });
 
   const seen = new Set<string>();
-  const suggestions: { label: string; timeMin: number }[] = [];
+  const suggestions: { label: string; timeMin: number | null }[] = [];
   for (const r of rows) {
     const lab = normalizeDailyPlanLabel(r.label);
     if (!lab) continue;
@@ -45,13 +45,17 @@ export async function GET() {
     seen.add(lab);
     if (hiddenSet.has(lab)) continue;
     if (pinnedLabels.has(lab)) continue;
-    if (r.timeMin == null) continue;
     suggestions.push({ label: lab, timeMin: r.timeMin });
     if (suggestions.length >= 50) break;
   }
 
   suggestions.sort((a, b) => {
-    if (a.timeMin !== b.timeMin) return a.timeMin - b.timeMin;
+    if (a.timeMin != null && b.timeMin != null) {
+      if (a.timeMin !== b.timeMin) return a.timeMin - b.timeMin;
+      return a.label.localeCompare(b.label, "he");
+    }
+    if (a.timeMin != null) return -1;
+    if (b.timeMin != null) return 1;
     return a.label.localeCompare(b.label, "he");
   });
 
