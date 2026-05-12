@@ -1680,10 +1680,10 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
               </div>
               {showTaskAssigneesInModal && (
                 <div>
-                  <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">משויכים למטלה</p>
-                  <div className="max-h-32 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                  <p className="mb-0.5 text-sm text-zinc-600 dark:text-zinc-300">משויכים למטלה</p>
+                  <div className="max-h-32 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 px-1.5 py-0.5 dark:border-zinc-700">
                     {taskModalAssignableUsers.map((u) => (
-                      <label key={u.id} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm touch-manipulation">
+                      <label key={u.id} className="flex min-h-9 cursor-pointer items-center gap-1.5 py-0.5 text-sm touch-manipulation">
                         <input
                           type="checkbox"
                           checked={taskUserIds.includes(u.id)}
@@ -1695,16 +1695,28 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                           }}
                           className="size-5 shrink-0"
                         />
-                        <span className="min-w-0 break-words">{u.name}</span>
+                        <span className="min-w-0 break-words leading-snug">{u.name}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
               <div>
-                <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">
-                  תלויות (יש להשלים לפני המטלה הנוכחית)
-                </p>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <p className="min-w-0 flex-1 text-sm text-zinc-600 dark:text-zinc-300">
+                    תלויות (יש להשלים לפני המטלה הנוכחית)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTaskPrereqModalOpen(true)}
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-base font-semibold leading-none text-indigo-600 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-indigo-400 dark:hover:bg-zinc-700 dark:active:bg-zinc-600"
+                    aria-label={
+                      taskPrereqIds.length ? "עריכת רשימת תלויות" : "הוספת תלויות למטלה"
+                    }
+                  >
+                    +
+                  </button>
+                </div>
                 {taskPrereqIds.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     {taskPrereqIds.map((id) => {
@@ -1729,13 +1741,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     })}
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setTaskPrereqModalOpen(true)}
-                  className={`${btnSecondary} w-full sm:w-auto`}
-                >
-                  {taskPrereqIds.length ? "עריכת תלויות…" : "בחר תלויות…"}
-                </button>
               </div>
             </form>
           </div>
