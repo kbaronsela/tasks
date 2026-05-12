@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { contrastOnBackground, resolveTopicColor } from "@/lib/topic-color";
@@ -65,6 +65,14 @@ function formatHeDate(iso: string | null): string {
   });
 }
 
+/** בחירת נושא ממוקד במרכז: שומר בחירה קודמת, אחר כך העדפת משתמש, אחר כך הנושא הראשון בתצוגה */
+function pickFocusTopicId(displayTopics: Topic[], prevFocus: string | null, preferredId: string | null): string | null {
+  if (displayTopics.length === 0) return null;
+  if (prevFocus && displayTopics.some((t) => t.id === prevFocus)) return prevFocus;
+  if (preferredId && displayTopics.some((t) => t.id === preferredId)) return preferredId;
+  return displayTopics[0].id;
+}
+
 /** מציגים שורת «משויכים» בכרטיס רק כשיש יותר ממשתמש אחד במטלה, וכשאין נושא עם חבר יחיד */
 function shouldShowTaskAssigneesOnCard(t: TaskItem, topics: Topic[]): boolean {
   const topicMembers = t.topic
@@ -73,20 +81,27 @@ function shouldShowTaskAssigneesOnCard(t: TaskItem, topics: Topic[]): boolean {
   return t.users.length > 1 && (topicMembers === 0 || topicMembers > 1);
 }
 
+const modalChromeBtnCls =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors";
+
 function ModalCloseButton({
   onClick,
   align = "center",
+  floating = true,
 }: {
   onClick: () => void;
   align?: "center" | "top";
+  /** ברירת מחדל: מיקום צף בראש שמאל למודאל; false — כפתור inline (למשל בשורת כלים עם שמירה) */
+  floating?: boolean;
 }) {
   const alignCls =
     align === "center" ? "top-1/2 -translate-y-1/2" : "top-0";
+  const positionCls = floating ? `absolute left-0 ${alignCls}` : "";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`absolute left-0 inline-flex size-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 ${alignCls}`}
+      className={`${positionCls} ${modalChromeBtnCls} text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-200`}
       aria-label="סגור"
     >
       <svg
@@ -108,6 +123,9 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const router = useRouter();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [showArchivedTopics, setShowArchivedTopics] = useState(false);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  /** נושא שיוצג בכניסה ל«מה היום?»; null = הנושא הראשון שנשאר בתצוגה */
+  const [defaultFocusTopicId, setDefaultFocusTopicId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   /** נושא פעיל לתצוגת המרכז; null כשאין נושאים במערכת */
@@ -160,11 +178,28 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
   const [draftDateTo, setDraftDateTo] = useState("");
   const [draftOnlyMyTasks, setDraftOnlyMyTasks] = useState(false);
 
-  const loadTopics = useCallback(async () => {
+  const loadTopics = useCallback(async (): Promise<Topic[]> => {
     const r = await fetch("/api/topics");
     if (!r.ok) throw new Error("טעינת נושאים נכשלה");
     const data = await r.json();
-    setTopics(data.topics);
+    const list = data.topics as Topic[];
+    setTopics(list);
+    return list;
+  }, []);
+
+  const loadPrefs = useCallback(async () => {
+    try {
+      const r = await fetch("/api/auth/me");
+      if (!r.ok) throw new Error("not ok");
+      const data = await r.json();
+      const pref = data.user?.defaultFocusTopicId as string | null | undefined;
+      const normalized = typeof pref === "string" && pref.trim() ? pref.trim() : null;
+      setDefaultFocusTopicId(normalized);
+    } catch {
+      setDefaultFocusTopicId(null);
+    } finally {
+      setPrefsLoaded(true);
+    }
   }, []);
 
   const displayTopics = useMemo(
@@ -172,9 +207,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     [topics, showArchivedTopics],
   );
 
-  const loadTasks = useCallback(async () => {
+  /** למודאל מטלה — רק נושאים שאינם בארכיון; בעת עריכה נשמר גם הנושא הנוכחי אם הועבר לארכיון */
+  const taskModalTopicChoices = useMemo(
+    () => topics.filter((t) => !t.archived || t.id === taskTopicId),
+    [topics, taskTopicId],
+  );
+
+  const loadTasks = useCallback(async (topicIdOverride?: string | null) => {
     const params = new URLSearchParams();
-    const topicParam = focusTopicId ?? "all";
+    const resolvedTopic = topicIdOverride !== undefined ? topicIdOverride : focusTopicId;
+    const topicParam = resolvedTopic ?? "all";
     if (topicParam !== "all") {
       params.set("topic", topicParam);
     }
@@ -197,18 +239,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTasks(data.tasks);
   }, [focusTopicId, showCompletedTasks, dateFilterFrom, dateFilterTo, onlyMyTasks]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!prefsLoaded) return;
     if (displayTopics.length === 0) {
       setFocusTopicId(null);
       setHubTab("tasks");
       setOnlyMyTasks(false);
       return;
     }
-    setFocusTopicId((prev) => {
-      if (prev && displayTopics.some((t) => t.id === prev)) return prev;
-      return displayTopics[0].id;
-    });
-  }, [displayTopics]);
+    setFocusTopicId((prev) => pickFocusTopicId(displayTopics, prev, defaultFocusTopicId));
+  }, [displayTopics, prefsLoaded, defaultFocusTopicId]);
 
   const loadUsers = useCallback(async () => {
     const r = await fetch("/api/users");
@@ -223,8 +263,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       setLoading(true);
       setError(null);
       try {
-        await Promise.all([loadTopics(), loadUsers()]);
-        await loadTasks();
+        await Promise.all([loadTopics(), loadUsers(), loadPrefs()]);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "שגיאה");
       } finally {
@@ -234,7 +273,12 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     return () => {
       cancelled = true;
     };
-  }, [loadTopics, loadTasks, loadUsers]);
+  }, [loadTopics, loadPrefs, loadUsers]);
+
+  useEffect(() => {
+    if (loading || !prefsLoaded) return;
+    void loadTasks();
+  }, [loading, prefsLoaded, loadTasks]);
 
   useEffect(() => {
     if (!inviteModalOpen) return;
@@ -452,6 +496,30 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const saveDefaultFocusTopic = useCallback(
+    async (topicId: string | null) => {
+      setError(null);
+      const r = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultFocusTopicId: topicId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(typeof j.error === "string" ? j.error : "עדכון נכשל");
+        return;
+      }
+      const raw = j.user?.defaultFocusTopicId as string | null | undefined;
+      const next =
+        typeof raw === "string" && raw.trim() ? raw.trim() : null;
+      setDefaultFocusTopicId(next);
+      if (next && displayTopics.some((x) => x.id === next)) setFocusTopicId(next);
+      setToast("ברירת המחדל ל«מה היום?» עודכנה");
+      setTimeout(() => setToast(null), 3000);
+    },
+    [displayTopics],
+  );
+
   const openEditTopic = (t: Topic) => {
     setEditingTopicId(t.id);
     setEditTopicTitle(t.title);
@@ -494,6 +562,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
       setError("מחיקה נכשלה");
       return;
     }
+    if (defaultFocusTopicId === id) setDefaultFocusTopicId(null);
     if (taskTopicId === id) setTaskTopicId("");
     await loadTopics();
     await loadTasks();
@@ -1252,6 +1321,51 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </span>
               </span>
             </label>
+            <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">נושא ראשי ב«מה היום?»</p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                הנושא שיוצג כברירת המחדל בכניסה לדף ניהול המטלות. אם הנושא הראשי מוסתר (ארכיון), תוצג בחירה אחרת לפי ההגדרות.
+              </p>
+              <ul className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label="נושא ראשי במסך מה היום">
+                <li className="flex items-start gap-2.5 rounded-xl border border-dashed border-zinc-300/90 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800/50">
+                  <input
+                    type="radio"
+                    name="dashDefaultFocusTopic"
+                    id="dash-default-topic-none"
+                    checked={defaultFocusTopicId === null}
+                    onChange={() => void saveDefaultFocusTopic(null)}
+                    className="mt-0.5 size-4 shrink-0 text-indigo-600"
+                  />
+                  <label htmlFor="dash-default-topic-none" className="cursor-pointer leading-snug">
+                    ללא העדפה — הנושא הראשון ברשימת הנושאים (לפי המיון)
+                  </label>
+                </li>
+                {topics.map((t) => (
+                  <li
+                    key={`primary-${t.id}`}
+                    className={`flex items-start gap-2.5 rounded-xl border border-zinc-200/90 px-3 py-2 text-sm dark:border-zinc-700 ${
+                      t.archived ? "opacity-80" : ""
+                    }`}
+                    style={topicLabelStyle(t)}
+                  >
+                    <input
+                      type="radio"
+                      name="dashDefaultFocusTopic"
+                      id={`dash-default-topic-${t.id}`}
+                      checked={defaultFocusTopicId === t.id}
+                      onChange={() => void saveDefaultFocusTopic(t.id)}
+                      className="mt-0.5 size-4 shrink-0 text-indigo-600"
+                    />
+                    <label htmlFor={`dash-default-topic-${t.id}`} className="min-w-0 flex-1 cursor-pointer leading-snug">
+                      <span className="font-medium">{t.title}</span>
+                      {t.archived ? (
+                        <span className="ms-1 text-xs font-normal text-zinc-700 dark:text-zinc-300">(בארכיון)</span>
+                      ) : null}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
             <ul className="mt-4 flex flex-col gap-2">
               {displayTopics.map((t) => (
                 <li
@@ -1488,14 +1602,26 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
           role="presentation"
           onClick={(e) => e.target === e.currentTarget && setTaskModal(false)}
         >
-          <div className="my-auto w-full max-w-lg max-h-[min(92dvh,840px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-xl sm:p-6 dark:bg-zinc-900">
-            <div className="relative mb-4 flex min-h-9 items-center justify-center">
-              <ModalCloseButton onClick={() => setTaskModal(false)} />
+          <div className="my-auto w-full max-w-lg max-h-[min(85dvh,520px)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-3 shadow-xl sm:p-4 dark:bg-zinc-900">
+            <div className="relative mb-3 flex min-h-9 items-center justify-center ps-[4.75rem] pe-[4.75rem]">
+              <div className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                <button
+                  type="submit"
+                  form="task-modal-form"
+                  className={`${modalChromeBtnCls} bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500`}
+                  aria-label="שמירה"
+                >
+                  <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.25" aria-hidden>
+                    <path d="M5 12.5 9.7 17 19 8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <ModalCloseButton floating={false} onClick={() => setTaskModal(false)} />
+              </div>
               <h3 className="text-center text-base font-semibold sm:text-lg">
                 {editTaskId ? "עריכת מטלה" : "מטלה חדשה"}
               </h3>
             </div>
-            <form onSubmit={submitTask} className="flex flex-col gap-3">
+            <form id="task-modal-form" onSubmit={submitTask} className="flex flex-col gap-2.5">
               <input
                 required
                 placeholder="כותרת"
@@ -1508,8 +1634,8 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 placeholder="תיאור (אופציונלי)"
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
-                rows={3}
-                className="min-h-[5rem] w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
+                rows={2}
+                className="min-h-[4.25rem] w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800"
               />
               {editTaskId ? (
                 <label className="text-sm">
@@ -1520,7 +1646,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                     className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                   >
                     <option value="">ללא נושא</option>
-                    {topics.map((t) => (
+                    {taskModalTopicChoices.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.title}
                       </option>
@@ -1537,7 +1663,7 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                       className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                     >
                       <option value="">ללא נושא</option>
-                      {topics.map((t) => (
+                      {taskModalTopicChoices.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.title}
                         </option>
@@ -1553,24 +1679,26 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   </button>
                 </div>
               )}
-              <label className="text-sm">
-                מועד לביצוע
-                <input
-                  type="datetime-local"
-                  value={taskScheduled}
-                  onChange={(e) => setTaskScheduled(e.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
-                />
-              </label>
-              <label className="text-sm">
-                לביצוע עד
-                <input
-                  type="datetime-local"
-                  value={taskDue}
-                  onChange={(e) => setTaskDue(e.target.value)}
-                  className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
-                />
-              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="min-w-0 text-sm">
+                  מועד לביצוע
+                  <input
+                    type="datetime-local"
+                    value={taskScheduled}
+                    onChange={(e) => setTaskScheduled(e.target.value)}
+                    className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-zinc-300 px-2 py-2 text-[0.8rem] dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
+                  />
+                </label>
+                <label className="min-w-0 text-sm">
+                  לביצוע עד
+                  <input
+                    type="datetime-local"
+                    value={taskDue}
+                    onChange={(e) => setTaskDue(e.target.value)}
+                    className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-zinc-300 px-2 py-2 text-[0.8rem] dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
+                  />
+                </label>
+              </div>
               {showTaskAssigneesInModal && (
                 <div>
                   <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">משויכים למטלה</p>
@@ -1628,14 +1756,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   className={`${btnSecondary} w-full sm:w-auto`}
                 >
                   {taskPrereqIds.length ? "עריכת תלויות…" : "בחר תלויות…"}
-                </button>
-              </div>
-              <div className="mt-2 flex justify-stretch pt-2 sm:justify-end">
-                <button
-                  type="submit"
-                  className="min-h-11 w-full touch-manipulation rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 sm:w-auto"
-                >
-                  שמירה
                 </button>
               </div>
             </form>

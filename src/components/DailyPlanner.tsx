@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import confetti from "canvas-confetti";
 
 type User = { id: string; name: string; email: string };
 
@@ -53,6 +54,144 @@ function shiftYmd(ymd: string, deltaDays: number): string {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
+}
+
+const ROW_DONE_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#a855f7", "#ec4899"];
+
+function celebratePlannerRowDone() {
+  void confetti({
+    particleCount: 95,
+    spread: 68,
+    origin: { y: 0.66 },
+    colors: ROW_DONE_COLORS,
+    ticks: 120,
+    gravity: 1.06,
+    scalar: 0.96,
+  });
+}
+
+const DAY_DONE_COLORS = ["#fde047", "#fb923c", "#f472b6", "#a78bfa", "#38bdf8", "#34d399", "#facc15"];
+
+let plannerFxCtx: AudioContext | null = null;
+
+function plannerAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (plannerFxCtx?.state === "closed") plannerFxCtx = null;
+  if (plannerFxCtx) return plannerFxCtx;
+  const AW = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+  const Ctor = window.AudioContext ?? AW.webkitAudioContext;
+  if (!Ctor) return null;
+  try {
+    plannerFxCtx = new Ctor();
+    return plannerFxCtx;
+  } catch {
+    return null;
+  }
+}
+
+/** אפקט מחיאות-כפיים עדין מתוך אות משתמש (אחרי לחיצה) */
+function playPlannerApplause() {
+  const ctx = plannerAudioContext();
+  if (!ctx) return;
+  void ctx.resume().catch(() => undefined);
+  const t0 = ctx.currentTime + 0.02;
+  for (let k = 0; k < 10; k++) {
+    const t = t0 + k * (0.08 + Math.random() * 0.04);
+    const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.06), ctx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / ch.length);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 900 + Math.random() * 500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    src.connect(lp);
+    lp.connect(g);
+    g.connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.08);
+  }
+}
+
+function celebratePlannerDayComplete() {
+  playPlannerApplause();
+
+  void confetti({
+    particleCount: 130,
+    spread: 88,
+    origin: { x: 0.5, y: 0.56 },
+    startVelocity: 44,
+    decay: 0.91,
+    colors: DAY_DONE_COLORS,
+    ticks: 200,
+    scalar: 1.06,
+  });
+
+  window.setTimeout(() => {
+    void confetti({
+      particleCount: 70,
+      angle: 60,
+      spread: 62,
+      origin: { x: 0.04, y: 0.7 },
+      colors: DAY_DONE_COLORS,
+      startVelocity: 52,
+    });
+    void confetti({
+      particleCount: 70,
+      angle: 120,
+      spread: 62,
+      origin: { x: 0.96, y: 0.7 },
+      colors: DAY_DONE_COLORS,
+      startVelocity: 52,
+    });
+  }, 170);
+
+  window.setTimeout(() => {
+    void confetti({
+      particleCount: 110,
+      spread: 158,
+      startVelocity: 35,
+      origin: { x: 0.5, y: 0.42 },
+      gravity: 0.92,
+      ticks: 220,
+      colors: DAY_DONE_COLORS,
+      scalar: 1.1,
+    });
+  }, 360);
+
+  window.setTimeout(() => {
+    void confetti({
+      particleCount: 100,
+      spread: 228,
+      startVelocity: 24,
+      origin: { x: 0.5, y: 0.93 },
+      colors: DAY_DONE_COLORS,
+      gravity: 0.7,
+      decay: 0.93,
+      ticks: 180,
+      scalar: 0.92,
+    });
+  }, 580);
+
+  window.setTimeout(() => {
+    void confetti({
+      particleCount: 50,
+      spread: 330,
+      startVelocity: 22,
+      origin: { x: 0.32, y: 0.55 },
+      colors: DAY_DONE_COLORS,
+    });
+    void confetti({
+      particleCount: 50,
+      spread: 330,
+      startVelocity: 22,
+      origin: { x: 0.68, y: 0.55 },
+      colors: DAY_DONE_COLORS,
+    });
+  }, 940);
 }
 
 type InlinePlanRowProps = {
@@ -449,6 +588,12 @@ export function DailyPlanner({ user }: { user: User }) {
 
   const toggleDone = async (it: PlanItem) => {
     setError(null);
+    const markingDone = !it.done;
+    const completeWholeDay =
+      markingDone &&
+      items.length > 0 &&
+      items.every((row) => row.id === it.id || row.done);
+
     const r = await fetch(`/api/daily-plan/${it.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -459,6 +604,17 @@ export function DailyPlanner({ user }: { user: User }) {
       setError((data as { error?: string }).error ?? "עדכון נכשל");
       return;
     }
+
+    if (markingDone) {
+      if (completeWholeDay) {
+        celebratePlannerDayComplete();
+        setToast("וואו! סיימת את כל מה שתיכננת להיום! 👏 🎉");
+        setTimeout(() => setToast(null), 5200);
+      } else {
+        celebratePlannerRowDone();
+      }
+    }
+
     await loadItems();
   };
 

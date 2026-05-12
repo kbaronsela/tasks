@@ -13,6 +13,9 @@ model User {
   name         String
   /// null = משתמש שנכנס רק דרך Google (או ספק OAuth אחר בעתיד)
   passwordHash String?
+  /// נושא שיוצג כברירת מחדל בכניסה ל«מה היום?»
+  defaultFocusTopicId String?
+  defaultFocusTopic   Topic?       @relation("UserDefaultFocusTopic", fields: [defaultFocusTopicId], references: [id], onDelete: SetNull)
   createdAt    DateTime     @default(now())
   topics       TopicUser[]
   tasks        TaskUser[]
@@ -107,6 +110,7 @@ model Topic {
   events      TopicEvent[]
   shoppingItems TopicShoppingItem[]
   packingItems TopicPackingItem[]
+  usersWithDefaultFocus User[] @relation("UserDefaultFocusTopic")
 }
 
 model TopicExpense {
