@@ -1632,13 +1632,13 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   </select>
                 </label>
               ) : (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-2">
-                  <label className="min-w-0 flex-1 text-sm">
-                    <span className="block">נושא</span>
+                <label className="block text-sm">
+                  <span className="block">נושא</span>
+                  <div className="mt-1 flex items-center gap-1.5">
                     <select
                       value={taskTopicId}
                       onChange={(e) => setTaskTopicId(e.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
+                      className="min-h-11 min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-800 sm:text-sm"
                     >
                       <option value="">ללא נושא</option>
                       {taskModalTopicChoices.map((t) => (
@@ -1647,15 +1647,16 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={openTopicModalFromTask}
-                    className={`${btnSecondary} min-h-11 w-full shrink-0 sm:w-auto`}
-                  >
-                    נושא חדש
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={openTopicModalFromTask}
+                      className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-zinc-300 bg-white text-base font-semibold leading-none text-indigo-600 shadow-sm hover:bg-indigo-50 active:bg-indigo-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-indigo-400 dark:hover:bg-zinc-700 dark:active:bg-zinc-600"
+                      aria-label="נושא חדש"
+                    >
+                      +
+                    </button>
+                  </div>
+                </label>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <label className="min-w-0 text-sm">
