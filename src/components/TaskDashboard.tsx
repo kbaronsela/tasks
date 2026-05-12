@@ -514,7 +514,11 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
         typeof raw === "string" && raw.trim() ? raw.trim() : null;
       setDefaultFocusTopicId(next);
       if (next && displayTopics.some((x) => x.id === next)) setFocusTopicId(next);
-      setToast("ברירת המחדל ל«מה היום?» עודכנה");
+      setToast(
+        topicId === null
+          ? "הוסר נושא ראשי — יוצג הנושא הראשון ברשימה"
+          : "נושא ראשי ל«מה היום?» עודכן",
+      );
       setTimeout(() => setToast(null), 3000);
     },
     [displayTopics],
@@ -1321,51 +1325,6 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                 </span>
               </span>
             </label>
-            <div className="mt-5 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">נושא ראשי ב«מה היום?»</p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                הנושא שיוצג כברירת המחדל בכניסה לדף ניהול המטלות. אם הנושא הראשי מוסתר (ארכיון), תוצג בחירה אחרת לפי ההגדרות.
-              </p>
-              <ul className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label="נושא ראשי במסך מה היום">
-                <li className="flex items-start gap-2.5 rounded-xl border border-dashed border-zinc-300/90 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800/50">
-                  <input
-                    type="radio"
-                    name="dashDefaultFocusTopic"
-                    id="dash-default-topic-none"
-                    checked={defaultFocusTopicId === null}
-                    onChange={() => void saveDefaultFocusTopic(null)}
-                    className="mt-0.5 size-4 shrink-0 text-indigo-600"
-                  />
-                  <label htmlFor="dash-default-topic-none" className="cursor-pointer leading-snug">
-                    ללא העדפה — הנושא הראשון ברשימת הנושאים (לפי המיון)
-                  </label>
-                </li>
-                {topics.map((t) => (
-                  <li
-                    key={`primary-${t.id}`}
-                    className={`flex items-start gap-2.5 rounded-xl border border-zinc-200/90 px-3 py-2 text-sm dark:border-zinc-700 ${
-                      t.archived ? "opacity-80" : ""
-                    }`}
-                    style={topicLabelStyle(t)}
-                  >
-                    <input
-                      type="radio"
-                      name="dashDefaultFocusTopic"
-                      id={`dash-default-topic-${t.id}`}
-                      checked={defaultFocusTopicId === t.id}
-                      onChange={() => void saveDefaultFocusTopic(t.id)}
-                      className="mt-0.5 size-4 shrink-0 text-indigo-600"
-                    />
-                    <label htmlFor={`dash-default-topic-${t.id}`} className="min-w-0 flex-1 cursor-pointer leading-snug">
-                      <span className="font-medium">{t.title}</span>
-                      {t.archived ? (
-                        <span className="ms-1 text-xs font-normal text-zinc-700 dark:text-zinc-300">(בארכיון)</span>
-                      ) : null}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
             <ul className="mt-4 flex flex-col gap-2">
               {displayTopics.map((t) => (
                 <li
@@ -1383,6 +1342,25 @@ export function TaskDashboard({ user }: { user: User & { id: string } }) {
                   </span>
                   <span className="shrink-0 opacity-90">({t.taskCount})</span>
                   <div className="flex w-full shrink-0 flex-wrap justify-end gap-2 sm:mr-auto sm:w-auto sm:justify-start">
+                    <button
+                      type="button"
+                      className={`min-h-9 min-w-[44px] touch-manipulation rounded-md px-2 py-1 font-medium transition-colors hover:underline active:opacity-90 ${
+                        defaultFocusTopicId === t.id
+                          ? "bg-white/95 text-emerald-900 ring-2 ring-emerald-600/70 dark:bg-black/55 dark:text-emerald-200 dark:ring-emerald-500/75"
+                          : "bg-white/25 hover:bg-white/40 dark:bg-black/20 dark:hover:bg-black/35"
+                      }`}
+                      aria-pressed={defaultFocusTopicId === t.id}
+                      title={
+                        defaultFocusTopicId === t.id
+                          ? "לחצו להסרת נושא ראשי (יתבסס על סדר הנושאים)"
+                          : "קבעו נושא זה כברירת מחדל בכניסה ל«מה היום?»"
+                      }
+                      onClick={() =>
+                        void saveDefaultFocusTopic(defaultFocusTopicId === t.id ? null : t.id)
+                      }
+                    >
+                      ראשי
+                    </button>
                     <button
                       type="button"
                       className="min-h-9 min-w-[44px] touch-manipulation rounded-md bg-white/25 px-2 py-1 font-medium hover:bg-white/40 hover:underline active:bg-white/50 dark:bg-black/20 dark:hover:bg-black/35"
